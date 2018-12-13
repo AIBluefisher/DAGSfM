@@ -1,3 +1,6 @@
+# Graph Structure from Motion
+
+
 ## Linux compilation
 
 ### Setup the required external library.
@@ -9,7 +12,7 @@ If you want see the view graph svg logs
 * sudo apt-get install graphviz
 ```
 
-```
+```bash
  $ cd i23dSfM
  $ mkdir build && cd build
  $ cmake -D CUDA_USE_STATIC_CUDA_RUNTIME=OFF ..
@@ -19,4 +22,6 @@ For test if build successfully
  $ make test
 
 ### Usage:
+```bash
  python build/software/Sfm/Sfm_SequentialPipeline.py image_dir output_dir
+```
