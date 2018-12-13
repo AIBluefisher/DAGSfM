@@ -1,0 +1,112 @@
+
+# Copyright (c) 2015 Pierre MOULON.
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#
+
+# Config file for I23dSFM library - Find I23dSFM & dependencies.
+#
+# This file is used by CMake when FIND_PACKAGE( I23dSFM ) is invoked (and
+# the directory containing this file is present in CMAKE_MODULE_PATH).
+#
+# This module defines the following variables:
+#
+# I23DSFM_FOUND: True if I23dSFM has been successfully found.
+#
+# I23DSFM_VERSION: Version of I23dSFM found.
+#
+# I23DSFM_INCLUDE_DIRS: Include directories for I23dSFM and the
+#                       dependencies which appear in the I23dSFM public
+#                       API and are thus required to use I23dSFM.
+#
+# I23DSFM_LIBRARIES: Libraries for I23dSFM and all
+#                    dependencies against which I23dSFM was
+#                    compiled.
+
+# Called if we failed to find Ceres or any of it's required dependencies,
+# unsets all public (designed to be used externally) variables and reports
+# error message at priority depending upon [REQUIRED/QUIET/<NONE>] argument.
+MACRO(I23DSFM_REPORT_NOT_FOUND REASON_MSG)
+  # FindPackage() only references Ceres_FOUND, and requires it to be
+  # explicitly set FALSE to denote not found (not merely undefined).
+  SET(I23DSFM_FOUND FALSE)
+  UNSET(I23DSFM_INCLUDE_DIRS)
+  UNSET(I23DSFM_LIBRARIES)
+
+  # Reset the CMake module path to its state when this script was called.
+  SET(CMAKE_MODULE_PATH ${CALLERS_CMAKE_MODULE_PATH})
+
+  # Note <package>_FIND_[REQUIRED/QUIETLY] variables defined by
+  # FindPackage() use the camelcase library name, not uppercase.
+  IF (I23DSFM_FIND_QUIETLY)
+    MESSAGE(STATUS "Failed to find I23DSFM - " ${REASON_MSG} ${ARGN})
+  ELSE (I23DSFM_FIND_REQUIRED)
+    MESSAGE(FATAL_ERROR "Failed to find I23DSFM - " ${REASON_MSG} ${ARGN})
+  ELSE()
+    # Neither QUIETLY nor REQUIRED, use SEND_ERROR which emits an error
+    # that prevents generation, but continues configuration.
+    MESSAGE(SEND_ERROR "Failed to find I23DSFM - " ${REASON_MSG} ${ARGN})
+  ENDIF ()
+  RETURN()
+ENDMACRO(I23DSFM_REPORT_NOT_FOUND)
+
+# Set the version.
+SET(I23DSFM_VERSION @I23DSFM_VERSION@)
+
+# Get the (current, i.e. installed) directory containing this file.
+GET_FILENAME_COMPONENT(CURRENT_CONFIG_INSTALL_DIR
+  "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+# Record the state of the CMake module path when this script was
+# called so that we can ensure that we leave it in the same state on
+# exit as it was on entry, but modify it locally.
+SET(CALLERS_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
+# Reset CMake module path to the installation directory of this
+# script.
+SET(CMAKE_MODULE_PATH ${CURRENT_CONFIG_INSTALL_DIR})
+
+# Build the absolute root install directory as a relative path
+GET_FILENAME_COMPONENT(CURRENT_ROOT_INSTALL_DIR
+  ${CMAKE_MODULE_PATH}/../../../ ABSOLUTE)
+IF (NOT EXISTS ${CURRENT_ROOT_INSTALL_DIR})
+  I23DSFM_REPORT_NOT_FOUND(
+    "I23dSFM install root: ${CURRENT_ROOT_INSTALL_DIR}, "
+    "determined from relative path from I23dSFMConfig.cmake install location: "
+    "${CMAKE_MODULE_PATH}, does not exist.")
+ENDIF (NOT EXISTS ${CURRENT_ROOT_INSTALL_DIR})
+
+# Check if I23dSFM header is installed
+IF (NOT EXISTS ${CURRENT_ROOT_INSTALL_DIR}/include/i23dSFM/version.hpp)
+  I23DSFM_REPORT_NOT_FOUND(
+    "I23dSFM install root: ${CMAKE_MODULE_PATH}. "
+    "Cannot find i23dSFM include files.")
+ENDIF (NOT EXISTS ${CURRENT_ROOT_INSTALL_DIR}/include/i23dSFM/version.hpp)
+
+# Set the include directories for I23dSFM (itself) and all (potentially optional)
+# dependencies with which I23dSFM was compiled.
+SET(I23DSFM_INCLUDE_DIRS "@I23dSFM_INCLUDE_DIRS@")
+
+##### the libraries themselves come in via I23dSFMTargets-<release/debug>.cmake
+# as link libraries rules as target.
+
+# Import exported I23dSFM targets
+SET(I23DSFM_LIBRARIES @I23dSFM_LIBRARIES@)
+INCLUDE(${CURRENT_CONFIG_INSTALL_DIR}/I23dSFMTargets.cmake)
+
+# As we use I23DSFM_REPORT_NOT_FOUND() to abort, if we reach this point we have
+# found I23dSFM and all required dependencies.
+MESSAGE(STATUS "----")
+MESSAGE(STATUS "I23dSFM Find_Package")
+MESSAGE(STATUS "----")
+MESSAGE(STATUS "Found I23dSFM version: ${I23DSFM_VERSION}")
+MESSAGE(STATUS "Installed in: ${CURRENT_ROOT_INSTALL_DIR}")
+MESSAGE(STATUS "Used I23dSFM libraries: ${I23DSFM_LIBRARIES}")
+MESSAGE(STATUS "----")
+
+SET(I23DSFM_FOUND TRUE)
+
+# Reset the CMake module path to its state when this script was called.
+SET(CMAKE_MODULE_PATH ${CALLERS_CMAKE_MODULE_PATH})
+

@@ -1,0 +1,19 @@
+
+file(
+  GLOB_RECURSE
+  system_files_header
+  *.hpp
+)
+file(
+  GLOB_RECURSE
+  system_files_cpp
+  *.cpp
+)
+
+ADD_LIBRARY(i23dSFM_system
+  ${sytem_files_header}
+  ${system_files_cpp})
+SET_TARGET_PROPERTIES(i23dSFM_system PROPERTIES SOVERSION ${I23DSFM_VERSION_MAJOR} VERSION "${I23DSFM_VERSION_MAJOR}.${I23DSFM_VERSION_MINOR}")
+SET_PROPERTY(TARGET i23dSFM_system PROPERTY FOLDER I23dSFM/I23dSFM)
+INSTALL(TARGETS i23dSFM_system DESTINATION lib/ EXPORT i23dSFM-targets)
+

@@ -1,0 +1,45 @@
+language: C++
+
+sudo: required
+
+compiler:
+  # - clang   # there seems to be a bug in clang with c++11 stuff like pthread and chrono.
+  - gcc
+
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "rP7m69mIVJ3RtHOMirK8tyk4F2E86dA5QK0Qbbman/V2VQBwWAC23AigjX2xSw2fi6eWgDNvOY6B0a4mIQdnLYhQlw4ka3qBRHh+b0Mo3hpX3zKiGVj1wQusspu6sZgT9aIL2xPhZWzYHOgEY5GZPGppGEZDNleB352Xkq+CuGK5nuxnC7UYwjU8960n6L6R3nug/8G2VIxqTSIGI2yrhGBLrSqUhTSEa0NK1KqPnIG5t7YnOTl4O2eaOtWHSxsDxmbvf/xQ0tzc4WCOhHFhniRZniGUVOf/ncCqOIARCVaqZsZQJvkvuPhKxHW/uLzcEpY4JzTZ6hZ1QXgf/eTCkXqEqGaIIKeia5Yy/sx7aD4azBVQNMK9E8kIgN1pb/Bp8PM0RGp5v+mrvFHDakLTjnVLc7Q97v9MH0zwgWfLVz8oN3no3o3ggvakSBQ9uNHySQMYWHyTna0POoK/nrPY7xoZbzqPQP/Pm4XPIiwFXx50otwtvEFFZF8ulSbgJOg4LexrLLLNjlk0DepOzF3RQ25c7RUDqns55rVmcNKzh2obEu+5ct7ZvC4EHvq60SFpOBwlPPvtoNiyI7tzTKpXjtIWsTiEDAhiyDRlUYBuZdkZQOsrARe76gywhHlOUFs9S4Pg3/VogmiGbfvxdmorZ7qoHWck9dgG0hu6HWz4PZI="
+
+addons:
+  coverity_scan:
+    project:
+      name: "hlzz/libvot"
+      description: "Build submitted via Travis CI"
+    notification_email: shentianweipku@gmail.com
+    build_command_prepend: "mkdir build_coverity; cd build_coverity; cmake .."
+    build_command:   "make -j4"
+    branch_pattern: coverity_scan
+  apt:
+    sources:
+      - boost-latest
+      - ubuntu-toolchain-r-test 
+    packages:
+      - libboost1.55-all-dev
+      - python-dev
+      - libboost-python1.55-dev
+
+notifications:
+    # Emails are sent to the committers' git-configured email address
+    email:
+        on_failure: always
+
+before_install: 
+    - scripts/travis-ci_update.sh
+
+install: 
+    - scripts/travis-ci_install_deps.sh
+
+script: 
+    - scripts/travis-ci_install.sh
