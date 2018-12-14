@@ -69,6 +69,6 @@ For large scale reconstruction, our GSfM is highly recommended.
 python build/software/SfM/SfM_DC_Pipeline_singlematch.py $image_dir $output_dir $max_img_num
 ```
 
-```$image_dir```:   The directory that stores images
-```$output_dir```:  The directory that stores the reconstruciton results
-```$max_img_num```: The maximum image number in each cluster. For example, ```80~120```.
+- ```$image_dir```:   The directory that stores images
+- ```$output_dir```:  The directory that stores the reconstruciton results
+- ```$max_img_num```: The maximum image number in each cluster. For example, ```80~120```.
