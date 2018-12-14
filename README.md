@@ -69,7 +69,6 @@ cd GraphSfM
 mkdir build && cd build
 cmake -D CUDA_USE_STATIC_CUDA_RUNTIME=OFF ..
 make -j4
-make test
 ```
 
 ## 4. Usage
