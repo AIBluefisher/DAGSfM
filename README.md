@@ -9,7 +9,7 @@ multiple point clouds alignment more robust. After the completion of local SfM i
 The pipleline of our SfM approaches is shown below:
 <div align=center> 
 
-![](img/pipeline.png)
+![](docs/img/pipeline.png)
 
 </div>
 
@@ -21,7 +21,7 @@ The figure below is our reconstruction results.
 **Left:** raw images, **middle:** global sparse point cloud, **right:** point clouds where different parts are rendered in different colors. From top to bottom are respectively Gerrard Hall, Person Hall, Eastern Corner, Eastern Parts, Middle Parts. More reconstruction results can be found in [GSfM](GSfM.github.io).
 <div align=center> 
 
-![recon_compare](img/recon_compare.png)
+![recon_compare](docs/img/recon_compare.png)
 
 </div>
 
@@ -30,7 +30,7 @@ The figure below is our reconstruction results.
 Comparison of reconstruction results. N_p , N_c represents the number of 3D points and the number of recovered cameras, respectively. T_GC , T_SfM , T_PCA , T_P respectively denotes the time cost (seconds) of graph cluster step, local SfM step, point clouds alignment step, and the total time. The best results are highlighted in boldface. In **Person Hall** data-set, ```TheiaSfM``` failed due to the failure of finding an initial pair, ```OpenMVG``` failed due to blocked too long time when triangulation. The last three rows are large scale aerial data-sets, ```COLMAP``` takes too long time to finish such large scale datas, and ```TheiaSfM``` often produces bad parts in these data-sets, thus are not evaluated.
 <div align=center> 
 
-![statistic](img/table.png)
+![statistic](docs/img/table.png)
 
 </div>
 
@@ -39,7 +39,7 @@ Comparison of reconstruction results. N_p , N_c represents the number of 3D poin
 The two dot lines show the real tendency of OpenMVG and our approach. The running time of ```COLMAP``` and ```OpenMVG``` grows quadraticly when the scale of images increases. ```TheiaSfM``` and our approach grows linearly, while our approaches more robust than TheiaSfM.
 <div align=center> 
 
-![runtime](img/results/runtime.png)
+![runtime](docs/img/results/runtime.png)
 </div>
 
 ## 3. How to Build
