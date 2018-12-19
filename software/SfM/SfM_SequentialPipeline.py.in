@@ -33,10 +33,8 @@ import shutil
 
 input_dir = sys.argv[1]
 output_dir = sys.argv[2]
-max_image_number = sys.argv[3]
-gms=sys.argv[4]
+
 matches_dir = os.path.join(output_dir, "matches")
-blocks_path = matches_dir + "/blocks_path.txt"
 reconstruction_dir = os.path.join(output_dir, "reconstruction_sequential")
 camera_file_params = os.path.join(CAMERA_SENSOR_WIDTH_DIRECTORY, "sensor_width_camera_database.txt")
 
@@ -57,17 +55,10 @@ print ("\033[31m step 1 : before intrinsics analysis\033[00m " + time.asctime(ti
 pIntrisics = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_SfMInit_ImageListing"), "-e","1", "-i", input_dir, "-g","1","-o", matches_dir, "-d", camera_file_params] )
 pIntrisics.wait()
 
-
-flog.write("before generate matches blocks \t\t" + time.asctime(time.localtime(time.time())) + '\n')
-print ("\033[31m step 2 : before generate matches blocks\033[00m " + time.asctime(time.localtime(time.time())))
-pBlocks = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_GenerateMatchBlocks"), matches_dir + "/sfm_data.json", max_image_number] )
-pBlocks.wait()
-
-
 start=time.time()
 
 
-print ("\033[31m step 3 : before compute features\033[00m " + time.asctime(time.localtime(time.time())))
+print ("\033[31m step 2 : before compute features\033[00m " + time.asctime(time.localtime(time.time())))
 flog.write("before compute features \t\t" + time.asctime(time.localtime(time.time())) + '\n')
 pFeatures = subprocess.Popen([os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeFeatures"),  "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-m", "SIFT", "-p", "HIGH" ])
 pFeatures.wait()
@@ -77,50 +68,11 @@ print("sift spend time:"+str(end-start))
 start=end
 
 
-f_blocks = open(blocks_path, 'r')
-k = 0
-while True:
-  line = f_blocks.readline()
-  if not line : break
-  
-  match_block_file = line.strip('\n')
-  block_matches_dir = matches_dir + '/' + str(k)
-  if not os.path.exists(block_matches_dir):
-    os.mkdir(block_matches_dir)
-  k = k + 1
+print ("\033[31m step 3 : before compute matches\033[00m " + time.asctime(time.localtime(time.time())))
+flog.write("before compute matches \t\t\t" + time.asctime(time.localtime(time.time())) + '\n')
+pMatches = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeMatches"), "-i", matches_dir+"/sfm_data.json", "-o", matches_dir,"-G","0"] )
+pMatches.wait()
 
-  print ("\033[31m step 4 : before compute matches\033[00m " + time.asctime(time.localtime(time.time())))
-  flog.write("before compute matches \t\t\t" + time.asctime(time.localtime(time.time())) + '\n')
-
-  pMatches = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeMatches"), "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-l", match_block_file, "-G", gms] )
-
-  pMatches.wait()
-  if os.path.isfile(matches_dir+"/geometric_matches"):
-    shutil.move(matches_dir+"/geometric_matches", block_matches_dir+"/geometric_matches")
-  if os.path.isfile(matches_dir+"/geometric_matches.svg"):
-    shutil.move(matches_dir+"/geometric_matches.svg", block_matches_dir+"/geometric_matches.svg")
-  if os.path.isfile(matches_dir+"/matches.f.txt"):
-    shutil.move(matches_dir+"/matches.f.txt", block_matches_dir+"/matches.f.txt")
-  if os.path.isfile(matches_dir+"/matches.putative.txt"):
-    shutil.move(matches_dir+"/matches.putative.txt", block_matches_dir+"/matches.putative.txt")
-  if os.path.isfile(matches_dir+"/matchfiler_time.txt"):
-    shutil.move(matches_dir+"/matchfiler_time.txt", block_matches_dir+"/matchfiler_time.txt")
-  if os.path.isfile(matches_dir+"/points.txt"):
-    shutil.move(matches_dir+"/points.txt", block_matches_dir+"/points.txt")
-  if os.path.isfile(matches_dir+"/putative_matches"):
-    shutil.move(matches_dir+"/putative_matches", block_matches_dir+"/putative_matches")
-  if os.path.isfile(matches_dir+"/putative_matches.svg"):
-    shutil.move(matches_dir+"/putative_matches.svg", block_matches_dir+"/putative_matches.svg")
-
-# print ("\033[31m step 4 : before compute matches\033[00m " + time.asctime(time.localtime(time.time())))
-# flog.write("before compute matches \t\t\t" + time.asctime(time.localtime(time.time())) + '\n')
-# pMatches = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeMatches"), "-i", matches_dir+"/sfm_data.json", "-o", matches_dir,"-G",gms] )
-# pMatches.wait()
-
-flog.write("Before Merge Matches Blocks \t\t" + time.asctime(time.localtime(time.time())) + '\n')
-print ("\033[31m step 5 : Before Merge Matches Blocks\033[00m " + time.asctime(time.localtime(time.time())))
-mBlocks = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_MergeBlockMatches"), matches_dir + "/sfm_data.json", matches_dir + "/matches_list.txt"] )
-mBlocks.wait()
 
 print("match spend time:"+str(time.time()-start))
 
@@ -131,23 +83,23 @@ print("match spend time:"+str(time.time()-start))
 if not os.path.exists(reconstruction_dir):
     os.mkdir(reconstruction_dir)
 
-print ("\033[31m step 6 : before Incremental reconstruction\033[00m " + time.asctime(time.localtime(time.time())))
+print ("\033[31m step 4 : before Incremental reconstruction\033[00m " + time.asctime(time.localtime(time.time())))
 flog.write("before Incremental reconstruction \t" + time.asctime(time.localtime(time.time())) + '\n')
 pRecons = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_IncrementalSfM"),  "-i", matches_dir+"/sfm_data.json", "-m", matches_dir, "-o", reconstruction_dir, "-r", "1"] )
 pRecons.wait()
 
-print ("\033[31m step 7 : before colorize structure\033[00m " + time.asctime(time.localtime(time.time())))
+print ("\033[31m step 5 : before colorize structure\033[00m " + time.asctime(time.localtime(time.time())))
 flog.write("before colorize structure \t\t" + time.asctime(time.localtime(time.time())) + '\n')
 pRecons = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeSfM_DataColor"),  "-i", reconstruction_dir+"/sfm_data.json", "-o", os.path.join(reconstruction_dir,"colorized.ply")] )
 pRecons.wait()
 
 # optional, compute final valid structure from the known camera poses
-print ("\033[31m step 8 : before structure from known poses\033[00m " + time.asctime(time.localtime(time.time())))
+print ("\033[31m step 6 : before structure from known poses\033[00m " + time.asctime(time.localtime(time.time())))
 flog.write("before structure from known posses \t" + time.asctime(time.localtime(time.time())) + '\n')
 pRecons = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeStructureFromKnownPoses"),  "-i", reconstruction_dir+"/sfm_data.json", "-m", matches_dir, "-f", os.path.join(matches_dir, "matches.f.txt"), "-o", os.path.join(reconstruction_dir,"robust.json")] )
 pRecons.wait()
 
-print ("\033[31m step 9 : before write ply files\033[00m " + time.asctime(time.localtime(time.time())))
+print ("\033[31m step 7 : before write ply files\033[00m " + time.asctime(time.localtime(time.time())))
 flog.write("before write ply files \t\t\t" + time.asctime(time.localtime(time.time())) + '\n')
 pRecons = subprocess.Popen( [os.path.join(I23DSFM_SFM_BIN, "i23dSFM_main_ComputeSfM_DataColor"),  "-i", reconstruction_dir+"/robust.json", "-o", os.path.join(reconstruction_dir,"robust_colorized.ply"), "-p", os.path.join(reconstruction_dir,"photo_align.ply"), "-m", reconstruction_dir] )
 pRecons.wait()
