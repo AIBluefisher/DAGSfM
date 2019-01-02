@@ -38,25 +38,25 @@ static bool Generate_SfM_Report( const SfM_Data & sfm_data, const std::string & 
   }
   using namespace htmlDocument;
   // extract directory from htmlFilename
-  const std::string sTableBegin = "<table border=\"1\">",
+  const std::string sTableBegin = "<table class=\"table table-bordered table-hover\" border=\"1\">",
                     sTableEnd = "</table>",
                     sRowBegin= "<tr>", sRowEnd = "</tr>",
                     sColBegin = "<td>", sColEnd = "</td>",
                     sNewLine = "<br>", sFullLine = "<hr>";
 
-  htmlDocument::htmlDocumentStream htmlDocStream("SFM report.");
+  htmlDocument::htmlDocumentStream htmlDocStream("SfM report.");
   htmlDocStream.pushInfo(
-  htmlDocument::htmlMarkup("h1", std::string("SFM report.")));
+  htmlDocument::htmlMarkup("h1 class=\"text-center\"", std::string("SfM Report")));
   htmlDocStream.pushInfo(sFullLine);
 
   htmlDocStream.pushInfo( "Dataset info:" + sNewLine );
 
   std::ostringstream os;
-  os << " #views: " << sfm_data.GetViews().size() << sNewLine
-     << " #poses: " << sfm_data.GetPoses().size() << sNewLine
-     << " #intrinsics: " << sfm_data.GetIntrinsics().size() << sNewLine
-     << " #tracks: " << sfm_data.GetLandmarks().size() << sNewLine
-     << " #residuals: " << residualCount << sNewLine;
+  os << " Views: " << sfm_data.GetViews().size() << sNewLine
+     << " Poses: " << sfm_data.GetPoses().size() << sNewLine
+     << " Intrinsics: " << sfm_data.GetIntrinsics().size() << sNewLine
+     << " Tracks: " << sfm_data.GetLandmarks().size() << sNewLine
+     << " Residuals: " << residualCount << sNewLine;
 
   htmlDocStream.pushInfo( os.str() );
   htmlDocStream.pushInfo( sFullLine );

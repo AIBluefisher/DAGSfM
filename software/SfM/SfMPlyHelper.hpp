@@ -47,16 +47,16 @@ static bool exportToPly(const std::vector<Vec3> & vec_points,
 
 /// Export 3D point vector and camera position to PLY format
 static bool exportToPly(const std::vector<Vec3> & vec_points,
-  const std::vector<Vec3> & vec_camPos,
-  const std::string & sFileName,
-  const std::vector<Vec3> * vec_coloredPoints = NULL)
+                        const std::vector<Vec3> & vec_camPos,
+                        const std::string & sFileName,
+                        const std::vector<Vec3> * vec_coloredPoints = NULL)
 {
   std::ofstream outfile;
   outfile.open(sFileName.c_str(), std::ios_base::out);
 
   outfile << "ply"
     << '\n' << "format ascii 1.0"
-    << '\n' << "element vertex " << vec_points.size()+vec_camPos.size()
+    << '\n' << "element vertex " << vec_points.size() // + vec_camPos.size()
     << '\n' << "property float x"
     << '\n' << "property float y"
     << '\n' << "property float z"
@@ -73,20 +73,43 @@ static bool exportToPly(const std::vector<Vec3> & vec_points,
       outfile << vec_points[i].transpose()
         << " " << (*vec_coloredPoints)[i].transpose() << "\n";
   }
-
-  for (size_t i=0; i < vec_camPos.size(); ++i)  {
-    outfile << vec_camPos[i].transpose()
-      << " 0 255 0" << "\n";
-  }
   outfile.flush();
-  bool bOk = outfile.good();
+
+  std::string folder = stlplus::folder_part(sFileName);
+  std::string basename = stlplus::basename_part(sFileName);
+
+  std::string camera_filename = folder + "/" + basename + "_poses.ply";
+  std::ofstream camera_outfile(camera_filename);
+  if (!camera_outfile.is_open()) {
+    std::cout << camera_filename << " cannot be opened!\n";
+    return false;
+  }
+  camera_outfile << "ply"
+                 << '\n' << "format ascii 1.0"
+                 << '\n' << "element vertex " << + vec_camPos.size()
+                 << '\n' << "property float x"
+                 << '\n' << "property float y"
+                 << '\n' << "property float z"
+                 << '\n' << "property uchar red"
+                 << '\n' << "property uchar green"
+                 << '\n' << "property uchar blue"
+                 << '\n' << "end_header" << std::endl;
+  for (size_t i = 0; i < vec_camPos.size(); ++i)  {
+    camera_outfile << vec_camPos[i].transpose()
+                   << " 0 255 0" << "\n";
+  }
+  camera_outfile.flush();
+  
+  bool bOk = outfile.good() && camera_outfile.good();
   outfile.close();
+  camera_outfile.close();
+
   return bOk;
 }
 
 static bool exportToPly(const std::vector<Vec3> & vec_points,
-                                      const std::vector<Vec3> * vec_coloredPoints,
-                                      const std::string & sFileName)
+                        const std::vector<Vec3> * vec_coloredPoints,
+                        const std::string & sFileName)
 {
   std::ofstream outfile;
   outfile.open(sFileName.c_str(), std::ios_base::out);

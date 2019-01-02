@@ -259,6 +259,41 @@ int main(int argc, char **argv)
 	std::cout << "Write ply file successfully" << std::endl;
   }
 
+  // export camera poses
+  std::string out_dir = stlplus::folder_part(sOutputPLY_Out);
+  ofstream out_pose(out_dir + "/camera_poses.txt");
+  if (!out_pose.is_open()) {
+    std::cout << "Camera output file " 
+              << out_dir + "/camera_poses.txt cannot be opened!\n";
+    return EXIT_FAILURE;
+  }
+
+  auto poses = sfm_data.GetPoses();
+  auto views = sfm_data.GetViews();
+  auto intrinsics = sfm_data.GetIntrinsics();
+  for (auto it = poses.begin(); it != poses.end(); it++) {
+    size_t k_id = views.at(it->first)->id_intrinsic;
+    std::shared_ptr<cameras::IntrinsicBase> intrinsic_base = intrinsics.at(k_id);
+    cameras::Pinhole_Intrinsic* intrinsic = 
+                                dynamic_cast<cameras::Pinhole_Intrinsic*>(intrinsic_base.get());
+    Mat3 K = intrinsic->K();
+    auto pose = it->second;
+    Vec3 center = pose.center();
+    Mat3 R = pose.rotation();
+    Vec3 t = -R * center;
+
+    Eigen::Matrix<double, 3, 4> P;
+    P(0, 0) = R(0, 0); P(0, 1) = R(0, 1); P(0, 2) = R(0, 2); P(0, 3) = t[0];
+    P(1, 0) = R(1, 0); P(1, 1) = R(1, 1); P(1, 2) = R(1, 2); P(1, 3) = t[1];
+    P(2, 0) = R(2, 0); P(2, 1) = R(2, 1); P(2, 2) = R(2, 2); P(2, 3) = t[2];
+    P = K * P;
+
+    out_pose << center[0] << " " << center[1] << " " << center[1] << " "
+             << P(2, 0) << " " << P(2, 1) << " " << P(2, 2) << " " << P(2, 3) << "\n";
+  }
+  std::cout << "Camera pose file saved in " << out_dir + "/poses.txt";
+  out_pose.close();
+
   // Compute the scene structure color
   std::vector<Vec3> vec_3dPoints, vec_tracksColor, vec_camPosition;
   if (ColorizeTracks(sfm_data, vec_3dPoints, vec_tracksColor))
