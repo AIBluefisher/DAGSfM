@@ -19,10 +19,6 @@ ENDIF()
 SET(STLPLUS_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/i23dSFM/third_party/stlplus3)
 ADD_SUBDIRECTORY(stlplus3)
 
-# Basic filesystem utils
-SET(GMS_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/i23dSFM/third_party/gms)
-ADD_SUBDIRECTORY(gms)
-
 # Normalized Cut utils
 SET(GRACLUS_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/i23dSFM/third_party/graclus)
 ADD_SUBDIRECTORY(graclus)

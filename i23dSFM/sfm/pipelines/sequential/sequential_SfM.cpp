@@ -900,10 +900,12 @@ bool SequentialSfMReconstructionEngine::Resection(const size_t viewIndex)
   TracksUtilsMap::GetTracksIdVector(map_tracksCommon, &set_tracksIds);
 
   // A2. intersects the track list with the reconstructed
+  // 把landmark的Id插入到reconstructed_trackId中
   std::set<size_t> reconstructed_trackId;
-  std::transform(_sfm_data.GetLandmarks().begin(), _sfm_data.GetLandmarks().end(),
-    std::inserter(reconstructed_trackId, reconstructed_trackId.begin()),
-    stl::RetrieveKey());
+  std::transform(_sfm_data.GetLandmarks().begin(), 
+                 _sfm_data.GetLandmarks().end(),
+                 std::inserter(reconstructed_trackId, reconstructed_trackId.begin()),
+                 stl::RetrieveKey());
 
   // Get the ids of the already reconstructed tracks
   std::set<size_t> set_trackIdForResection;

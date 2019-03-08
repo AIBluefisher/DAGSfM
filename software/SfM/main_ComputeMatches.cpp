@@ -44,7 +44,6 @@
 #include "i23dSFM/matching/pairwiseAdjacencyDisplay.hpp"
 #include "i23dSFM/matching/indMatch_utils.hpp"
 #include "i23dSFM/system/timer.hpp"
-#include "third_party/gms/gms_matcher.h"
 #include "i23dSFM/graph/graph.hpp"
 #include "i23dSFM/stl/stl.hpp"
 #include "i23dSFM/tracks/tracks.hpp"
@@ -147,7 +146,7 @@ int main(int argc, char **argv) {
     bool bForce = false;
     bool bGuided_matching = false;
     int imax_iteration = 2048;
-    bool gms = true;
+    // bool gms = true;
 
     //required
     cmd.add(make_option('i', sSfM_Data_Filename, "input_file"));
@@ -162,7 +161,7 @@ int main(int argc, char **argv) {
     cmd.add(make_option('f', bForce, "force"));
     cmd.add(make_option('m', bGuided_matching, "guided_matching"));
     cmd.add(make_option('I', imax_iteration, "max_iteration"));
-    cmd.add(make_option('G', gms, "use gms method"));
+    // cmd.add(make_option('G', gms, "use gms method"));
 
     try {
         if (argc == 1)
@@ -457,67 +456,67 @@ int main(int argc, char **argv) {
             ExportTracks(map_GeometricMatches, sMatchesDirectory);
         }
         else {
-            if (gms) {
-                #ifdef I23DSFM_USE_OPENMP
-                #pragma omp     parallel for schedule(dynamic)
-                #endif
+    //         if (gms) {
+    //             #ifdef I23DSFM_USE_OPENMP
+    //             #pragma omp     parallel for schedule(dynamic)
+    //             #endif
 
-                for (int pi = 0; pi < map_PutativesMatches.size(); ++pi) {
-                    PairWiseMatches::const_iterator iter = map_PutativesMatches.begin();
-                    std::advance(iter, pi);
+    //             for (int pi = 0; pi < map_PutativesMatches.size(); ++pi) {
+    //                 PairWiseMatches::const_iterator iter = map_PutativesMatches.begin();
+    //                 std::advance(iter, pi);
 
-                    auto p = *iter;
-                    auto pair_ids = p.first;
-                    auto keyPoint1 =
-                            regions_provider.get()->regions_per_view[pair_ids.first].get()->GetRegionsPositions();
+    //                 auto p = *iter;
+    //                 auto pair_ids = p.first;
+    //                 auto keyPoint1 =
+    //                         regions_provider.get()->regions_per_view[pair_ids.first].get()->GetRegionsPositions();
 
-                    vector<KeyPoint> scvKp1;
-                    for (auto p: keyPoint1) { scvKp1.emplace_back(Point2f(p.x(), p.y()), 20); }
+    //                 vector<KeyPoint> scvKp1;
+    //                 for (auto p: keyPoint1) { scvKp1.emplace_back(Point2f(p.x(), p.y()), 20); }
 
-                    auto keyPoint2 =
-                            regions_provider.get()->regions_per_view[pair_ids.second].get()->GetRegionsPositions();
+    //                 auto keyPoint2 =
+    //                         regions_provider.get()->regions_per_view[pair_ids.second].get()->GetRegionsPositions();
 
-                    vector<KeyPoint> scvKp2;
-                    for (auto p: keyPoint2) { scvKp2.emplace_back(Point2f(p.x(), p.y()), 20); }
+    //                 vector<KeyPoint> scvKp2;
+    //                 for (auto p: keyPoint2) { scvKp2.emplace_back(Point2f(p.x(), p.y()), 20); }
 
-                    vector<DMatch> dmatchs;
+    //                 vector<DMatch> dmatchs;
 
-                    for (auto m: p.second) { dmatchs.emplace_back(m._i, m._j, 0); }
+    //                 for (auto m: p.second) { dmatchs.emplace_back(m._i, m._j, 0); }
 
-                    gms_matcher gms(scvKp1,
-                                    Size(sfm_data.views[pair_ids.first].get()->ui_height,
-                                        sfm_data.views[pair_ids.first].get()->ui_width),
-                                    scvKp2,
-                                    Size(sfm_data.views[pair_ids.second].get()->ui_height,
-                                        sfm_data.views[pair_ids.second].get()->ui_width),
-                                    dmatchs);
+    //                 gms_matcher gms(scvKp1,
+    //                                 Size(sfm_data.views[pair_ids.first].get()->ui_height,
+    //                                     sfm_data.views[pair_ids.first].get()->ui_width),
+    //                                 scvKp2,
+    //                                 Size(sfm_data.views[pair_ids.second].get()->ui_height,
+    //                                     sfm_data.views[pair_ids.second].get()->ui_width),
+    //                                 dmatchs);
 
-                    cout << p.first.first << "-" << p.first.second << ":" << dmatchs.size() << endl;
-                    std::vector<bool> vbInliers;
-                    auto num_inliers = gms.GetInlierMask(vbInliers, true, true);
+    //                 cout << p.first.first << "-" << p.first.second << ":" << dmatchs.size() << endl;
+    //                 std::vector<bool> vbInliers;
+    //                 auto num_inliers = gms.GetInlierMask(vbInliers, true, true);
 
-                    cout << "Get total " << num_inliers << " matches." << endl;
-                    IndMatches matches;
+    //                 cout << "Get total " << num_inliers << " matches." << endl;
+    //                 IndMatches matches;
 
-                    // draw matches
-                    for (size_t i = 0; i < vbInliers.size(); ++i) {
-                        if (vbInliers[i] == true) {
-                            matches.emplace_back(dmatchs[i].queryIdx, dmatchs[i].trainIdx);
-                        }
-                    }
+    //                 // draw matches
+    //                 for (size_t i = 0; i < vbInliers.size(); ++i) {
+    //                     if (vbInliers[i] == true) {
+    //                         matches.emplace_back(dmatchs[i].queryIdx, dmatchs[i].trainIdx);
+    //                     }
+    //                 }
 
-    #ifdef I23DSFM_USE_OPENMP
-    #pragma  omp critical
-    #endif
-                    map_GeometricMatches.emplace(pair_ids, matches);
-                }
-            }
+    // #ifdef I23DSFM_USE_OPENMP
+    // #pragma  omp critical
+    // #endif
+    //                 map_GeometricMatches.emplace(pair_ids, matches);
+    //             }
+    //         }
 
-            else {
-                if(gms){
-                    map_PutativesMatches = map_GeometricMatches;
-                    map_GeometricMatches.clear();
-                }
+            // else {
+                // if(gms){
+                    // map_PutativesMatches = map_GeometricMatches;
+                    // map_GeometricMatches.clear();
+                // }
                 /* ac_ransac */
     //			map_PutativesMatches = map_GeometricMatches;
     //			map_GeometricMatches.clear();
@@ -568,7 +567,7 @@ int main(int argc, char **argv) {
                     }
                         break;
                 }
-            }
+            // }
         }
 
        
