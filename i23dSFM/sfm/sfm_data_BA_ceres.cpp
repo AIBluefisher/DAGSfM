@@ -224,7 +224,7 @@ bool Bundle_Adjustment_Ceres::Adjust(
   options.minimizer_progress_to_stdout = false;
   options.logging_type = ceres::SILENT;
   options.num_threads = _i23dSFM_options._nbThreads;
-  options.num_linear_solver_threads = _i23dSFM_options._nbThreads;
+  // options.num_linear_solver_threads = _i23dSFM_options._nbThreads;
 
   // Solve BA
   ceres::Solver::Summary summary;

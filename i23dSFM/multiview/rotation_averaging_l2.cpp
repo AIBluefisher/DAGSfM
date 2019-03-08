@@ -268,7 +268,7 @@ bool L2RotationAveraging_Refine(
   }
 #ifdef I23DSFM_USE_OPENMP
   solverOptions.num_threads = omp_get_max_threads();
-  solverOptions.num_linear_solver_threads = omp_get_max_threads();
+  // solverOptions.num_linear_solver_threads = omp_get_max_threads();
 #endif // I23DSFM_USE_OPENMP
 
   ceres::Solver::Summary summary;

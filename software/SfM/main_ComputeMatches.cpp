@@ -44,7 +44,6 @@
 #include "i23dSFM/matching/pairwiseAdjacencyDisplay.hpp"
 #include "i23dSFM/matching/indMatch_utils.hpp"
 #include "i23dSFM/system/timer.hpp"
-#include "third_party/gms/gms_matcher.h"
 #include "i23dSFM/graph/graph.hpp"
 #include "i23dSFM/stl/stl.hpp"
 #include "i23dSFM/tracks/tracks.hpp"
