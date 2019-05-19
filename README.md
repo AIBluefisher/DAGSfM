@@ -7,6 +7,9 @@
 
 [中文简介](./docs/README_ch.md)
 
+**A enhanced version of GraphSfM has been released in the new repo: https://github.com/AIBluefisher/EGSfM, and this repo
+would not be maintained any more.**
+
 ## 1. Overview of GSfM
 Our Structure from Motion approach, named **```Graph Structure from Motion```**, is aimed at large scale 3D reconstruction. Besides, we aimed at exploring the computation ability of computer and making SfM easily transferred to distributed system. Our work is partially based on an early version of [OpenMVG](https://github.com/openMVG/openMVG), while more robust and efficient than state-of-the-art open source Structure from Motion approaches (We rank **5-th** in [Tanks and Temples dataset](https://www.tanksandtemples.org/leaderboard/) - the **highest** rank of open-source 3D reconstruction systems).
 
