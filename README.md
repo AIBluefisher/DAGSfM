@@ -19,7 +19,7 @@ In our work, 3D reconstruction is deemed as a ```divide-and-conquer``` problem. 
 
 If you use this project for your research, please cite:
 ```
-@articale{ChenyuGraphSfM,
+@article{ChenyuGraphSfM,
     title={Graph-Based Large Scale Parallel Structure from Motion},
     author={Yu, Chen and Shuhan, Shen and Yisong Chen}
 }
