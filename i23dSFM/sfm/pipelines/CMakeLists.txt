@@ -1,4 +1,0 @@
-
-ADD_SUBDIRECTORY(sequential)
-ADD_SUBDIRECTORY(global)
-#ADD_SUBDIRECTORY(hybrid)
