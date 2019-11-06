@@ -81,11 +81,10 @@ Build our GraphSfM
 ```sh
 git clone https://github.com/AIBluefisher/GraphSfM.git
 cd GraphSfM
-git checkout dev
 mkdir build
 cd build
 cmake ..
-make
+make -j8
 sudo make install
 ```
 
