@@ -91,16 +91,21 @@ sudo make install
 ## 3. Usage
 
 As our algorithm is not integrated in the `GUI` of `COLMAP`, we offer a script to run the 
-distributed SfM:
+distributed SfM (We hope there is anyone that is interested in integrating this pipeline into the GUI):
 ```sh
 sudo chmod +x scripts/shell/distributed_sfm.sh
 ./distributed_sfm.sh $image_dir $num_images_ub $log_folder $completeness_ratio
 ```
 - ```$image_dir```:   The directory that stores images
 - ```$num_images_ub```: The maximum image number in each cluster. For example, ```80~120```.
-- ```$output_dir```:  The directory that stores the logs
+- ```$log_folder```:  The directory that stores the logs
 - ```$completeness_ratio```: The ratio that measure the repeatitive rate of adjacent clusters.
 
+If succeed, camera poses and sparse points should be included in `$DATASET/sparse` folder, you can use COLMAP's GUI to 
+import it and show the visual result:
+```sh
+./build/src/exe/colmap gui
+```
 For small scale reconstruction, you can set the `$num_images_ub` equal to the number of images, the program would just use the incremental SfM pipeline of [COLMAP](https://github.com/colmap/colmap).
 
 For large scale reconstruction, our `GraphSfM` is highly recommended, these parameters should be tuned carefully: larger `$num_images_ub` and `$completeness_ratio` can make reconstruction more robust, but also may lead to low efficiency and even degenerate to incremental one.
