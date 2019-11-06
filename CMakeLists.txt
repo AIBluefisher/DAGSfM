@@ -1,607 +1,485 @@
+# Copyright (c) 2018, ETH Zurich and UNC Chapel Hill.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#
+#     * Neither the name of ETH Zurich and UNC Chapel Hill nor the names of
+#       its contributors may be used to endorse or promote products derived
+#       from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
-# Copyright (c) 2012, 2013 i23dSFM authors.
+cmake_minimum_required(VERSION 3.0)
 
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+project(COLMAP)
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+set(COLMAP_VERSION "3.6")
+set(COLMAP_VERSION_NUMBER "3600")
 
-PROJECT(i23dSFM C CXX)
-# guard against in-source builds
-IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
-  message(FATAL_ERROR "In-source builds not allowed.")
-ENDIF()
 
-# ==============================================================================
-# I23dSFM build options
-# ==============================================================================
-OPTION(I23dSFM_BUILD_SHARED "Build I23dSFM shared libs" OFF)
-OPTION(I23dSFM_BUILD_TESTS "Build I23dSFM tests" OFF)
-OPTION(I23dSFM_BUILD_DOC "Build I23dSFM documentation" OFF)
-# OPTION(I23dSFM_BUILD_EXAMPLES "Build I23dSFM samples applications." ON)
-OPTION(I23dSFM_BUILD_OPENGL_EXAMPLES "Build I23dSFM openGL examples" OFF)
-OPTION(I23dSFM_BUILD_COVERAGE "Enable code coverage generation (gcc only)" OFF)
-OPTION(I23dSFM_USE_OPENMP "Enable OpenMP parallelization" ON)
-# ==============================================================================
-# Opencv is not used by i23dSFM but some samples show how to use openCV
-#  and i23dSFM simultaneously
-# ==============================================================================
-OPTION(I23dSFM_USE_OPENCV "Build or not opencv+i23dSFM samples programs" OFF)
+################################################################################
+# Include CMake dependencies
+################################################################################
 
-# ==============================================================================
-# Since OpenCV 3, SIFT is no longer in the default modules. See
-# https://github.com/itseez/opencv_contrib for more informations.
-# Enable this to be able to use OpenCV SIFT in main_ComputeFeatures_OpenCV.
-# ==============================================================================
-OPTION(I23dSFM_USE_OCVSIFT "Add or not OpenCV SIFT in available features" OFF)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-SET(I23DSFM_VERSION_MAJOR 0)
-SET(I23DSFM_VERSION_MINOR 8)
-SET(I23DSFM_VERSION_PATCH 1)
-SET(I23DSFM_VERSION
-    ${I23DSFM_VERSION_MAJOR}.${I23DSFM_VERSION_MINOR}.${I23DSFM_VERSION_PATCH})
+include(CheckCXXCompilerFlag)
 
-# Default build is in Release mode
-IF(NOT CMAKE_BUILD_TYPE AND NOT MSVC)
-  SET(CMAKE_BUILD_TYPE "Release")
-ENDIF(NOT CMAKE_BUILD_TYPE AND NOT MSVC)
+# Include helper macros and commands, and allow the included file to override
+# the CMake policies in this file
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeHelper.cmake NO_POLICY_SCOPE)
 
-# Set build path
-SET(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
-SET(LIBRARY_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
 
-IF (WIN32)
-  ADD_DEFINITIONS(-DNOMINMAX)
-  IF (MSVC)
-    ADD_DEFINITIONS(/bigobj)
-  ENDIF (MSVC)
-ENDIF (WIN32)
+################################################################################
+# Options
+################################################################################
 
-# Set shared or static mode
-IF(I23dSFM_BUILD_SHARED)
-  SET(BUILD_SHARED_LIBS ON)
-ELSEIF()
-  SET(BUILD_SHARED_LIBS OFF)
-ENDIF()
+option(SIMD_ENABLED "Whether to enable SIMD optimizations" ON)
+option(OPENMP_ENABLED "Whether to enable OpenMP parallelization" ON)
+option(IPO_ENABLED "Whether to enable interprocedural optimization" ON)
+option(CUDA_ENABLED "Whether to enable CUDA, if available" ON)
+option(OPENGL_ENABLED "Whether to enable OpenGL, if available" ON)
+option(TESTS_ENABLED "Whether to build test binaries" ON)
+option(PROFILING_ENABLED "Whether to enable google-perftools linker flags" OFF)
+option(CGAL_ENABLED "Whether to enable the CGAL library" ON)
+option(BOOST_STATIC "Whether to enable static boost library linker flags" ON)
+set(CUDA_ARCHS "Auto" CACHE STRING "List of CUDA architectures for which to \
+generate code, e.g., Auto, All, Maxwell, Pascal, ...")
 
-# ==============================================================================
-# Check that submodule have been initialized and updated
-# ==============================================================================
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/dependencies/cereal/include)
-  message(FATAL_ERROR
-    "\n submodule(s) are missing, please update your repository:\n"
-    "  > git submodule update -i\n")
+if(TESTS_ENABLED)
+    enable_testing()
 endif()
 
-# ==============================================================================
-# Additional cmake find modules
-# ==============================================================================
-SET(CMAKE_MODULE_PATH
-  ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmakeFindModules)
-INCLUDE(OptimizeForArchitecture)
-OptimizeForArchitecture()
-IF (SSE2_FOUND OR TARGET_ARCHITECTURE STREQUAL "native")
-  IF (MSVC AND NOT ${CMAKE_CL_64})
-    ADD_DEFINITIONS(/arch:SSE2)
-  ENDIF (MSVC AND NOT ${CMAKE_CL_64})
-  ADD_DEFINITIONS(-DI23DSFM_USE_SSE)
-ENDIF ()
-IF (UNIX AND NOT I23dSFM_BUILD_COVERAGE)
-  SET(CMAKE_C_FLAGS_RELEASE "-O3")
-  SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
-ENDIF ()
+if(BOOST_STATIC)
+    set(Boost_USE_STATIC_LIBS ON)
+else()
+    add_definitions("-DBOOST_TEST_DYN_LINK")
+endif()
 
-# ==============================================================================
-# Check C++11 support
-# ==============================================================================
-INCLUDE(CXX11)
-check_for_cxx11_compiler(CXX11_COMPILER)
-# If a C++11 compiler is available, then set the appropriate flags
-IF(CXX11_COMPILER)
-  ADD_DEFINITIONS(-DI23DSFM_USE_CXX11)
-  enable_cxx11()
-  INCLUDE(CheckIncludeFileCXX)
-  CHECK_INCLUDE_FILE_CXX(thread HAVE_CXX11_THREAD)
-  IF (HAVE_CXX11_THREAD)
-    ADD_DEFINITIONS(-DHAVE_CXX11_THREAD)
-  ENDIF(HAVE_CXX11_THREAD)
-    CHECK_INCLUDE_FILE_CXX(chrono HAVE_CXX11_CHRONO)
-  IF (HAVE_CXX11_CHRONO)
-    ADD_DEFINITIONS(-DHAVE_CXX11_CHRONO)
-  ENDIF(HAVE_CXX11_CHRONO)
-ENDIF(CXX11_COMPILER)
+################################################################################
+# Find packages
+################################################################################
 
-# ==============================================================================
-# OpenMP detection
-# ==============================================================================
-IF(I23dSFM_USE_OPENMP)
-  FIND_PACKAGE(OpenMP)
-  IF(OPENMP_FOUND)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    OPTION(I23dSFM_USE_OPENMP "Use OpenMP for parallelization" ON)
-    ADD_DEFINITIONS(-DI23DSFM_USE_OPENMP)
-    IF (NOT MSVC)
-      IF ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        # for those using the clang with OpenMP support
-        LIST(APPEND I23DSFM_LIBRARY_DEPENDENCIES iomp)
-      ELSE()
-        LIST(APPEND I23DSFM_LIBRARY_DEPENDENCIES gomp)
-      ENDIF()
-    ENDIF(NOT MSVC)
-  ENDIF(OPENMP_FOUND)
-ELSE(I23dSFM_USE_OPENMP)
-    OPTION(I23dSFM_USE_OPENMP "Use OpenMP for parallelization" OFF)
-    UPDATE_CACHE_VARIABLE(I23dSFM_USE_OPENMP OFF)
-    REMOVE_DEFINITIONS(-DI23DSFM_USE_OPENMP)
-ENDIF(I23dSFM_USE_OPENMP)
+if(OPENMP_ENABLED)
+    find_package(OpenMP QUIET)
+endif()
 
-# ==============================================================================
-# enable code coverage generation (only with GCC)
-# ==============================================================================
-IF(I23dSFM_BUILD_COVERAGE AND CMAKE_COMPILER_IS_GNUCXX)
-  MESSAGE("I23dSFM_BUILD_COVERAGE enabled")
-  SET(CMAKE_BUILD_TYPE "Debug")
-  ADD_DEFINITIONS(--coverage -fprofile-arcs -ftest-coverage)
-  SET(CMAKE_EXE_LINKER_FLAGS
-    "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
-ENDIF()
+find_package(Ceres REQUIRED)
 
-# ==============================================================================
-# IMAGE IO detection
-# ==============================================================================
-IF (NOT APPLE)
-  FIND_PACKAGE(JPEG QUIET)
-  FIND_PACKAGE(PNG QUIET)
-  FIND_PACKAGE(TIFF QUIET)
-ENDIF (NOT APPLE)
+find_package(Boost REQUIRED COMPONENTS
+             program_options
+             filesystem
+             graph
+             regex
+             system
+             unit_test_framework)
 
-# Folders
-SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
+find_package(Eigen3 REQUIRED)
 
-# ==============================================================================
-# SUBMODULE CONFIGURATION
-# ==============================================================================
-#- glfw
-# ==============================================================================
-IF (I23dSFM_BUILD_OPENGL_EXAMPLES)
-  SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Do not build the GLFW example programs")
-  SET(GLFW_BUILD_TESTS    OFF CACHE BOOL "Do not build the GLFW tests programs")
-  SET(GLFW_BUILD_DOCS     OFF CACHE BOOL "Do not build the GLFW documentation")
-  SET(GLFW_INSTALL        OFF CACHE BOOL "Do not generate the GLFW installation target")
-  ADD_SUBDIRECTORY(dependencies/glfw)
-  INCLUDE_DIRECTORIES(SYSTEM dependencies/glfw/include)
-  SET_PROPERTY(TARGET glfw PROPERTY FOLDER I23dSFM/3rdParty/glfw)
-ENDIF (I23dSFM_BUILD_OPENGL_EXAMPLES)
+find_package(FreeImage REQUIRED)
 
-#- Mosek (linear programming interface)
-#===============================================================================
-FIND_PACKAGE(Mosek)
-IF(MOSEK_FOUND)
-  ADD_DEFINITIONS(-DI23DSFM_HAVE_MOSEK)
-  SET(LP_INCLUDE_DIRS
-    ${MOSEK_INCLUDE}
-    ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Osi/src/OsiMsk/
-  )
-  INCLUDE_DIRECTORIES(${LP_INCLUDE_DIRS})
-ENDIF(MOSEK_FOUND)
+find_package(Glog REQUIRED)
 
-#INSTALL RULES
-INSTALL(
-  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/
-  DESTINATION include/i23dSFM_dependencies
-  COMPONENT headers
-  FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+find_package(OpenGL REQUIRED)
+find_package(Glew REQUIRED)
+find_package(Git)
+
+# Suitesparse
+find_package(SuiteSparse REQUIRED)
+if (SUITESPARSE_FOUND)
+  # On Ubuntu the system install of SuiteSparse (v3.4.0) up to at least
+  # Ubuntu 13.10 cannot be used to link shared libraries.
+  if (BUILD_SHARED_LIBS AND
+      SUITESPARSE_IS_BROKEN_SHARED_LINKING_UBUNTU_SYSTEM_VERSION)
+    message(FATAL_ERROR "You are attempting to build Theia as a shared "
+      "library on Ubuntu using a system package install of SuiteSparse "
+      "3.4.0. This package is broken and does not support the "
+      "construction of shared libraries (you can still build Theia as "
+      "a static library).  If you wish to build a shared version of Theia "
+      "you should uninstall the system install of SuiteSparse "
+      "(libsuitesparse-dev) and perform a source install of SuiteSparse "
+      "(we recommend that you use the latest version), "
+      "see http://theia-solver.org/building.html for more information.")
+  endif (BUILD_SHARED_LIBS AND
+    SUITESPARSE_IS_BROKEN_SHARED_LINKING_UBUNTU_SYSTEM_VERSION)
+  message("-- Found SuiteSparse ${SUITESPARSE_VERSION}")
+  add_definitions(-DTHEIA_SUITESPARSE_VERSION="${SUITESPARSE_VERSION}")
+else (SUITESPARSE_FOUND)
+  # Disable use of SuiteSparse if it cannot be found and continue.
+  message(FATAL_ERROR "Can't find SuiteSparse. This library is required "
+    "for bundle adjustment and for solving convex optimization problems. "
+    "Please set SUITESPARSE_INCLUDE_DIR & SUITESPARSE_LIBRARY")
+endif (SUITESPARSE_FOUND)
+
+#####################################
+############ find gtest #############
+#####################################
+message("-- Check for gtest")
+find_package(GTest REQUIRED)
+if (GTEST_FOUND)
+   message("-- Found GTest: ${GTEST_INCLUDE_DIRS}")
+   set(GTEST_LIBRARIES ${GTEST_LIBRARIES} 
+        /usr/local/lib/libgtest_main.a
+        /usr/local/lib/libgtest.a)
+#    message("-- Linked Libraries: ${GTEST_LIBRARIES}")
+else (GTEST_FOUND)
+   message(FATAL_ERROR "Can't find GTest. Please set GTEST_INCLUDE_DIRS & GTEST_LIBRARIES")
+endif (GTEST_FOUND)
+
+
+if (CGAL_ENABLED)
+  find_package(CGAL QUIET)
+endif()
+
+set(CUDA_MIN_VERSION "7.0")
+if(CUDA_ENABLED)
+    find_package(CUDA ${CUDA_MIN_VERSION} QUIET)
+endif()
+
+find_package(Qt5 5.4 REQUIRED COMPONENTS Core OpenGL Widgets)
+
+if(Qt5_FOUND)
+    message(STATUS "Found Qt")
+    message(STATUS "  Module : ${Qt5Core_DIR}")
+    message(STATUS "  Module : ${Qt5OpenGL_DIR}")
+    message(STATUS "  Module : ${Qt5Widgets_DIR}")
+endif()
+
+if(CGAL_FOUND)
+    message(STATUS "Found CGAL")
+    message(STATUS "  Includes : ${CGAL_INCLUDE_DIRS}")
+    message(STATUS "  Libraries : ${CGAL_LIBRARY}")
+endif()
+
+
+################################################################################
+# Compiler specific configuration
+################################################################################
+
+if(CMAKE_BUILD_TYPE)
+    message(STATUS "Build type specified as ${CMAKE_BUILD_TYPE}")
+else()
+    message(STATUS "Build type not specified, using Release")
+    set(CMAKE_BUILD_TYPE Release)
+    set(IS_DEBUG OFF)
+endif()
+
+if(IS_MSVC)
+    # Some fixes for the Glog library.
+    add_definitions("-DGLOG_NO_ABBREVIATED_SEVERITIES")
+    add_definitions("-DGL_GLEXT_PROTOTYPES")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+    # Enable object level parallel builds in Visual Studio.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+endif()
+
+if(IS_GNU)
+    # Hide incorrect warnings for uninitialized Eigen variables under GCC.
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized")
+endif()
+
+if(IS_DEBUG)
+    add_definitions("-DEIGEN_INITIALIZE_MATRICES_BY_NAN")
+endif()
+
+if(SIMD_ENABLED)
+    message(STATUS "Enabling SIMD support")
+else()
+    message(STATUS "Disabling SIMD support")
+endif()
+
+if(OPENMP_ENABLED AND OPENMP_FOUND)
+    message(STATUS "Enabling OpenMP support")
+    add_definitions("-DOPENMP_ENABLED")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else()
+    message(STATUS "Disabling OpenMP support")
+endif()
+
+if(IPO_ENABLED AND NOT IS_DEBUG AND NOT IS_GNU)
+    message(STATUS "Enabling interprocedural optimization")
+    set_property(DIRECTORY PROPERTY INTERPROCEDURAL_OPTIMIZATION 1)
+else()
+    message(STATUS "Disabling interprocedural optimization")
+endif()
+
+if(CUDA_FOUND)
+    if(CUDA_ENABLED)
+        add_definitions("-DCUDA_ENABLED")
+
+        include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SelectCudaComputeArch.cmake)
+
+        CUDA_SELECT_NVCC_ARCH_FLAGS(CUDA_ARCH_FLAGS ${CUDA_ARCHS})
+
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_ARCH_FLAGS}")
+
+        # Fix for some combinations of CUDA and GCC (e.g. under Ubuntu 16.04).
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -D_FORCE_INLINES")
+        # Do not show warnings if the architectures are deprecated.
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Wno-deprecated-gpu-targets")
+
+        message(STATUS "Enabling CUDA support (version: ${CUDA_VERSION_STRING},"
+                       " archs: ${CUDA_ARCH_FLAGS_readable})")
+    else()
+        set(CUDA_FOUND OFF)
+        message(STATUS "Disabling CUDA support")
+    endif()
+else()
+    set(CUDA_ENABLED OFF)
+    if(CUDA_VERSION_STRING)
+        message(STATUS "Disabling CUDA support (found version "
+                "${CUDA_VERSION_STRING} but >= ${CUDA_MIN_VERSION} required)")
+    else()
+        message(STATUS "Disabling CUDA support")
+    endif()
+endif()
+
+if(OPENGL_ENABLED)
+    add_definitions("-DOPENGL_ENABLED")
+    message(STATUS "Enabling OpenGL support")
+else()
+    message(STATUS "Disabling OpenGL support")
+endif()
+
+if(PROFILING_ENABLED)
+    message(STATUS "Enabling profiling support")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -lprofiler -ltcmalloc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lprofiler -ltcmalloc")
+else()
+    message(STATUS "Disabling profiling support")
+endif()
+
+if(CGAL_FOUND AND CGAL_ENABLED)
+    message(STATUS "Enabling CGAL support")
+    add_definitions("-DCGAL_ENABLED")
+else()
+    message(STATUS "Disabling CGAL support")
+    set(CGAL_ENABLED OFF)
+endif()
+
+# Qt5 was built with -reduce-relocations.
+if(Qt5_POSITION_INDEPENDENT_CODE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(CUDA_ENABLED AND NOT IS_MSVC)
+        set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --compiler-options -fPIC")
+    endif()
+endif()
+
+# Enable automatic compilation of Qt resource files.
+set(CMAKE_AUTORCC ON)
+
+
+################################################################################
+# Add sources
+################################################################################
+
+# Generate source file with version definitions.
+include(GenerateVersionDefinitions)
+
+set(COLMAP_INCLUDE_DIRS
+    ${Boost_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIRS}
+    ${SUITESPARSE_INCLUDE_DIRS}
+    ${GLOG_INCLUDE_DIRS}
+    ${GTEST_INCLUDE_DIRS}
+    ${FREEIMAGE_INCLUDE_DIRS}
+    ${CERES_INCLUDE_DIRS}
+    ${GLEW_INCLUDE_DIRS}
+    ${Qt5Core_INCLUDE_DIRS}
+    ${Qt5OpenGL_INCLUDE_DIRS}
+    ${Qt5Widgets_INCLUDE_DIRS}
 )
 
-# ==============================================================================
-# --END-- SUBMODULE CONFIGURATION
-# ==============================================================================
-
-# ==============================================================================
-# Enable cmake UNIT TEST framework
-# ==============================================================================
-IF(I23dSFM_BUILD_TESTS)
-  ENABLE_TESTING()
-ENDIF(I23dSFM_BUILD_TESTS)
-# MACRO to ease UnitTesting
-MACRO(UNIT_TEST NAMESPACE NAME EXTRA_LIBS)
-  IF(I23dSFM_BUILD_TESTS)
-    ADD_EXECUTABLE(${NAMESPACE}_test_${NAME} ${NAME}_test.cpp)
-
-    SET_PROPERTY(TARGET ${NAMESPACE}_test_${NAME} PROPERTY FOLDER I23dSFM/test)
-
-    TARGET_LINK_LIBRARIES(${NAMESPACE}_test_${NAME}
-                          ${EXTRA_LIBS} # Extra libs MUST be first.
-                          CppUnitLite ${I23DSFM_LIBRARY_DEPENDENCIES})
-    ADD_TEST(NAME ${NAMESPACE}_test_${NAME} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-             COMMAND $<TARGET_FILE:${NAMESPACE}_test_${NAME}>)
-  ENDIF(I23dSFM_BUILD_TESTS)
-ENDMACRO(UNIT_TEST)
-
-# ==============================================================================
-# Eigen
-# ==============================================================================
-# - internal by default,
-# - external if EIGEN_INCLUDE_DIR_HINTS is defined
-# ==============================================================================
-IF(NOT DEFINED EIGEN_INCLUDE_DIR_HINTS)
-  SET(EIGEN_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen)
-  SET(I23dSFM_USE_INTERNAL_EIGEN ON)
-ENDIF()
-FIND_PACKAGE(Eigen QUIET)
-IF(EIGEN_FOUND)
-  INCLUDE_DIRECTORIES(${EIGEN_INCLUDE_DIRS})
-ENDIF(EIGEN_FOUND)
-# Configure Eigen to use only MPL2 licensed code
-ADD_DEFINITIONS(-DEIGEN_MPL2_ONLY)
-
-# ==============================================================================
-# Ceres
-# ==============================================================================
-# - internal by default (ceres-solver+cxsparse+miniglog),
-# - external if CERES_DIR_HINTS and FIND_PACKAGE return a valid Ceres setup
-# ==============================================================================
-FIND_PACKAGE(Ceres QUIET HINTS ${CERES_DIR_HINTS})
-IF(NOT Ceres_FOUND)
-  SET(I23dSFM_USE_INTERNAL_CERES ON)
-  SET(CERES_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/internal/ceres/miniglog
-    ${PROJECT_BINARY_DIR}/third_party/ceres-solver/config)
-    FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/VERSION" CERES_CONFIG)
-    STRING(REGEX REPLACE "version ([0-9.]+).*" "\\1" CERES_VERSION ${CERES_CONFIG})
-  SET(CERES_LIBRARIES ceres cxsparse)
-ENDIF()
-# SET(I23dSFM_USE_INTERNAL_CERES ON)
-# SET(CERES_INCLUDE_DIRS
-  # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/include
-  # ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/internal/ceres/miniglog
-  # ${PROJECT_BINARY_DIR}/third_party/ceres-solver/config)
-  # FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ceres-solver/VERSION" CERES_CONFIG)
-  # STRING(REGEX REPLACE "version ([0-9.]+).*" "\\1" CERES_VERSION ${CERES_CONFIG})
-# SET(CERES_LIBRARIES ceres cxsparse)
-
-# ==============================================================================
-# Flann
-# ==============================================================================
-# - internal by default (flann),
-# - external if FLANN_INCLUDE_DIR_HINTS and a valid Flann setup is found
-# ==============================================================================
-IF(NOT DEFINED FLANN_INCLUDE_DIR_HINTS)
-  SET(FLANN_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/flann/src/cpp)
-  SET(I23dSFM_USE_INTERNAL_FLANN ON)
-ENDIF()
-FIND_PACKAGE(Flann QUIET)
-IF(NOT FLANN_FOUND OR I23dSFM_USE_INTERNAL_FLANN)
-  SET(FLANN_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/flann/src/cpp)
-  SET(FLANN_LIBRARY flann_cpp_s)
-ENDIF()
-
-# ==============================================================================
-# CoinUtils
-# ==============================================================================
-# - internal by default (CoinUtils),
-# - external if COINUTILS_INCLUDE_DIR_HINTS and a valid CoinUtils setup is found
-# ==============================================================================
-IF(NOT DEFINED COINUTILS_INCLUDE_DIR_HINTS)
-  SET(COINUTILS_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/CoinUtils/src/)
-  SET(I23dSFM_USE_INTERNAL_COINUTILS ON)
-ENDIF()
-FIND_PACKAGE(CoinUtils QUIET)
-IF(NOT COINUTILS_FOUND OR I23dSFM_USE_INTERNAL_COINUTILS)
-  SET(COINUTILS_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/CoinUtils/src/)
-  SET(COINUTILS_LIBRARY lib_CoinUtils)
-ENDIF()
-
-## ==============================================================================
-## Clp
-## ==============================================================================
-## - internal by default (Clp),
-## - external if CLP_INCLUDE_DIR_HINTS and a valid Clp setup is found
-## ==============================================================================
-IF(NOT DEFINED CLP_INCLUDE_DIR_HINTS)
-  SET(CLP_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Clp/src/)
-  SET(I23dSFM_USE_INTERNAL_CLP ON)
-ENDIF()
-FIND_PACKAGE(Clp QUIET)
-IF(NOT CLP_FOUND OR I23dSFM_USE_INTERNAL_CLP)
-  SET(CLP_INCLUDE_DIRS
-     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Clp/src/
-     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Clp/src/OsiClp/)
-  SET(CLP_LIBRARIES lib_clp lib_OsiClpSolver)
-ENDIF()
-
-# ==============================================================================
-# Osi
-# ==============================================================================
-# - internal by default (Osi),
-# - external if OSI_INCLUDE_DIR_HINTS and a valid Osi setup is found
-# ==============================================================================
-IF(NOT DEFINED OSI_INCLUDE_DIR_HINTS)
-  SET(OSI_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Osi/src/)
-  SET(I23dSFM_USE_INTERNAL_OSI ON)
-ENDIF()
-FIND_PACKAGE(Osi QUIET)
-IF(NOT OSI_FOUND OR I23dSFM_USE_INTERNAL_OSI)
-  SET(OSI_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/osi_clp/Osi/src/Osi/)
-  SET(OSI_LIBRARY lib_Osi)
-ENDIF()
-
-# ==============================================================================
-# Internal CLP/OSI/COINUTILS libraries:
-# ==============================================================================
-IF (I23dSFM_USE_INTERNAL_OSI AND I23dSFM_USE_INTERNAL_CLP AND I23dSFM_USE_INTERNAL_COINUTILS)
-  ADD_SUBDIRECTORY(dependencies/osi_clp/)
-  SET_PROPERTY(TARGET lib_clp PROPERTY FOLDER I23dSFM/3rdParty/lib_clp)
-  SET_PROPERTY(TARGET lib_CoinUtils PROPERTY FOLDER I23dSFM/3rdParty/lib_CoinUtils)
-  SET_PROPERTY(TARGET lib_Osi PROPERTY FOLDER I23dSFM/3rdParty/lib_Osi)
-  SET_PROPERTY(TARGET lib_OsiClpSolver PROPERTY FOLDER I23dSFM/3rdParty/lib_OsiClpSolver)
-ENDIF()
-
-# ==============================================================================
-# Lemon
-# ==============================================================================
-# - internal by default (Lemon),
-# - external if LEMON_INCLUDE_DIR_HINTS and a valid Lemon setup is found
-# ==============================================================================
-IF(NOT DEFINED LEMON_INCLUDE_DIR_HINTS)
-  SET(LEMON_INCLUDE_DIR_HINTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lemon)
-  SET(I23dSFM_USE_INTERNAL_LEMON ON)
-ENDIF()
-FIND_PACKAGE(Lemon QUIET)
-IF(NOT LEMON_FOUND OR I23dSFM_USE_INTERNAL_LEMON)
-  SET(LEMON_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lemon
-    ${PROJECT_BINARY_DIR}/third_party/lemon)
-  SET(LEMON_LIBRARY lemon)
-ENDIF()
-
-# ==============================================================================
-# OpenCV
-# ==============================================================================
-# - only external and enabled only if I23dSFM_USE_OPENCV is set to ON
-# ==============================================================================
-
-IF(I23dSFM_USE_OPENCV)
-  FIND_PACKAGE( OpenCV )
-  IF(NOT OpenCV_FOUND)
-    MESSAGE(STATUS "OpenCV was not found. Disabling OpenCV support.")
-    UPDATE_CACHE_VARIABLE(I23dSFM_USE_OPENCV OFF)
-    UPDATE_CACHE_VARIABLE(I23dSFM_USE_OCVSIFT OFF)
-  ELSE(NOT OpenCV_FOUND)
-    INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
-    IF(I23dSFM_USE_OCVSIFT)
-      ADD_DEFINITIONS(-DUSE_OCVSIFT)
-    ENDIF(I23dSFM_USE_OCVSIFT)
-    # add a definition that allows the conditional compiling
-    ADD_DEFINITIONS(-DHAVE_OPENCV)
-  ENDIF(NOT OpenCV_FOUND)
-ENDIF(I23dSFM_USE_OPENCV)
-
-
-# ==============================================================================
-# Third-party libraries:
-# ==============================================================================
-ADD_SUBDIRECTORY(third_party)
-
-# ==============================================================================
-# Include directories
-# ==============================================================================
-SET(I23dSFM_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${JPEG_INCLUDE_DIR}
-  ${PNG_INCLUDE_DIRS}
-  ${TIFF_INCLUDE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party
-  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies
-  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/cereal/include
-  ${LEMON_INCLUDE_DIRS}
-  ${EIGEN_INCLUDE_DIRS}
-  ${CERES_INCLUDE_DIRS}
-  ${FLANN_INCLUDE_DIRS}
-  ${LP_INCLUDE_DIRS}
-  ${COINUTILS_INCLUDE_DIRS}
-  ${CLP_INCLUDE_DIRS}
-  ${OSI_INCLUDE_DIRS}
-  CACHE PATH "include directories for i23dSFM and its dependencies"
+set(COLMAP_LINK_DIRS
+    ${Boost_LIBRARY_DIRS}
 )
 
-INCLUDE_DIRECTORIES(${I23dSFM_INCLUDE_DIRS})
-
-# ==============================================================================
-# i23dSFM modules
-# ==============================================================================
-# The i23dSFM library itself
-ADD_SUBDIRECTORY(i23dSFM)
-
-# ==============================================================================
-# i23dSFM libraries
-# ==============================================================================
-SET(I23dSFM_LIBRARIES
-  i23dSFM_image
-  i23dSFM_features
-  i23dSFM_matching_image_collection
-  i23dSFM_kvld
-  i23dSFM_multiview
-  i23dSFM_lInftyComputerVision
-  i23dSFM_system
-  i23dSFM_sfm)
-
-FOREACH(omvglib ${I23dSFM_LIBRARIES})
-  SET_PROPERTY(TARGET ${omvglib} PROPERTY FOLDER I23dSFM/I23dSFM)
-ENDFOREACH()
-
-# i23dSFM tutorial examples
-# IF (I23dSFM_BUILD_EXAMPLES)
-#   ADD_SUBDIRECTORY(i23dSFM_Samples)
-# ENDIF (I23dSFM_BUILD_EXAMPLES)
-
-# Complete software(s) build on i23dSFM libraries
-ADD_SUBDIRECTORY(software)
-
-# software(s) under patent or commercial licence
-# Included for research purpose only
-ADD_SUBDIRECTORY(nonFree)
-
-# ==============================================================================
-# Documentation
-# --------------------------
-# Sphinx detection
-# ==============================================================================
-IF(I23dSFM_BUILD_DOC)
-  FIND_PACKAGE(Sphinx)
-  IF (EXISTS ${SPHINX_EXECUTABLE})
-    SET(SPHINX_HTML_DIR "${CMAKE_CURRENT_BINARY_DIR}/htmlDoc")
-
-    CONFIGURE_FILE(
-      "${CMAKE_CURRENT_SOURCE_DIR}/../docs/sphinx/rst/conf.py"
-      "${CMAKE_CURRENT_BINARY_DIR}/conf.py"
-      @ONLY)
-
-    ADD_CUSTOM_TARGET(doc ALL
-      ${SPHINX_EXECUTABLE}
-      -b html
-      "${CMAKE_CURRENT_SOURCE_DIR}/../docs/sphinx/rst"
-      "${SPHINX_HTML_DIR}"
-      COMMENT "Building HTML documentation with Sphinx")
-
-    SET_PROPERTY(TARGET doc PROPERTY FOLDER I23dSFM)
-
-  ELSE (EXISTS ${SPHINX_EXECUTABLE})
-    MESSAGE("Sphinx need to be installed to generate the documentation")
-  ENDIF (EXISTS ${SPHINX_EXECUTABLE})
-ENDIF()
-
-MESSAGE("\n")
-
-MESSAGE("** I23dSFM version: " ${I23DSFM_VERSION})
-MESSAGE("** Build Shared libs: " ${I23dSFM_BUILD_SHARED})
-MESSAGE("** Build I23dSFM tests: " ${I23dSFM_BUILD_TESTS})
-MESSAGE("** Build I23dSFM documentation: " ${I23dSFM_BUILD_DOC})
-# MESSAGE("** Build I23dSFM samples applications: " ${I23dSFM_BUILD_EXAMPLES})
-MESSAGE("** Build I23dSFM openGL examples: " ${I23dSFM_BUILD_OPENGL_EXAMPLES})
-MESSAGE("** Enable code coverage generation: " ${I23dSFM_BUILD_COVERAGE})
-MESSAGE("** Enable OpenMP parallelization: " ${I23dSFM_USE_OPENMP})
-MESSAGE("** Build OpenCV+I23dSFM samples programs: " ${I23dSFM_USE_OPENCV})
-MESSAGE("** Use OpenCV SIFT features: " ${I23dSFM_USE_OCVSIFT})
-
-MESSAGE("\n")
-
-IF(DEFINED I23dSFM_USE_INTERNAL_EIGEN)
-  MESSAGE(STATUS "EIGEN: " ${EIGEN_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "EIGEN: " ${EIGEN_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_CERES)
-  MESSAGE(STATUS "CERES: " ${CERES_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "CERES: " ${CERES_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_FLANN)
-  MESSAGE(STATUS "FLANN: " ${FLANN_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "FLANN: " ${FLANN_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_TIFF)
-  MESSAGE(STATUS "LIBTIFF: " ${TIFF_VERSION_STRING} " (internal)")
-ELSE()
-  MESSAGE(STATUS "LIBTIFF: " ${TIFF_VERSION_STRING} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_PNG)
-  MESSAGE(STATUS "LIBPNG: " ${PNG_VERSION_STRING} " (internal)")
-ELSE()
-  MESSAGE(STATUS "LIBPNG: " ${PNG_VERSION_STRING} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_JPEG)
-  MESSAGE(STATUS "LIBJPEG (internal)")
-ELSE()
-  MESSAGE(STATUS "LIBJPEG (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_CLP)
-  MESSAGE(STATUS "CLP: " ${CLP_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "CLP: " ${CLP_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_COINUTILS)
-  MESSAGE(STATUS "COINUTILS: " ${COINUTILS_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "COINUTILS: " ${COINUTILS_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_OSI)
-  MESSAGE(STATUS "OSI: " ${OSI_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "OSI: " ${OSI_VERSION} " (external)")
-ENDIF()
-
-IF(DEFINED I23dSFM_USE_INTERNAL_LEMON)
-  MESSAGE(STATUS "LEMON: " ${LEMON_VERSION} " (internal)")
-ELSE()
-  MESSAGE(STATUS "LEMON: " ${LEMON_VERSION} " (external)")
-ENDIF()
-
-MESSAGE("\n")
-
-# ==============================================================================
-# INSTALL RULES
-# ==============================================================================
-
-INSTALL(EXPORT i23dSFM-targets DESTINATION lib)
-INSTALL(EXPORT i23dSFM-targets
-        DESTINATION share/i23dSFM/cmake FILE I23dSFMTargets.cmake)
-
-#Adapt build include paths to install path
-SET(I23dSFM_INCLUDE_DIRS
-  "${I23dSFM_INCLUDE_DIRS}"
-  "${CMAKE_INSTALL_PREFIX}/include/i23dSFM")
-
-STRING(REGEX REPLACE
-  "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_INSTALL_PREFIX}/include"
-  I23dSFM_INCLUDE_DIRS
-  "${I23dSFM_INCLUDE_DIRS}"
+set(COLMAP_EXTERNAL_LIBRARIES
+    ${CMAKE_DL_LIBS}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+    ${Boost_REGEX_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
+    ${GLOG_LIBRARIES}
+    ${GTEST_LIBRARIES}
+    ${FREEIMAGE_LIBRARIES}
+    ${CERES_LIBRARIES}
+    ${OPENGL_gl_LIBRARY}
+    ${OPENGL_glu_LIBRARY}
+    ${Qt5Core_LIBRARIES}
+    ${Qt5OpenGL_LIBRARIES}
+    ${Qt5Widgets_LIBRARIES}
 )
-STRING(REGEX REPLACE
-  "third_party"
-  "i23dSFM/third_party"
-  I23dSFM_INCLUDE_DIRS
-  "${I23dSFM_INCLUDE_DIRS}"
+
+if(CGAL_ENABLED)
+    list(APPEND COLMAP_INCLUDE_DIRS ${CGAL_INCLUDE_DIRS} ${GMP_INCLUDE_DIR})
+    list(APPEND COLMAP_EXTERNAL_LIBRARIES ${CGAL_LIBRARY} ${GMP_LIBRARIES})
+    list(APPEND COLMAP_LINK_DIRS ${CGAL_LIBRARIES_DIR})
+endif()
+
+if(UNIX)
+    list(APPEND COLMAP_EXTERNAL_LIBRARIES pthread)
+endif()
+
+set(COLMAP_INTERNAL_LIBRARIES
+    colmap
+    flann
+    graclus
+    lsd
+    pba
+    poisson_recon
+    sqlite3
+    sift_gpu
+    vlfeat
 )
-STRING(REGEX REPLACE
-  "dependencies"
-  "i23dSFM_dependencies"
-  I23dSFM_INCLUDE_DIRS
-  "${I23dSFM_INCLUDE_DIRS}"
+
+if(CUDA_ENABLED)
+    list(APPEND COLMAP_INTERNAL_LIBRARIES colmap_cuda colmap)
+endif()
+
+set(COLMAP_LIBRARIES
+    ${COLMAP_INTERNAL_LIBRARIES}
+    ${COLMAP_EXTERNAL_LIBRARIES}
 )
-IF (I23dSFM_USE_INTERNAL_CERES)
-  STRING(REGEX REPLACE
-    "ceres-solver"
-    "ceres"
-    I23dSFM_INCLUDE_DIRS
-    "${I23dSFM_INCLUDE_DIRS}"
-  )
-  STRING(REGEX REPLACE
-    "internal/ceres/"
-    ""
-    I23dSFM_INCLUDE_DIRS
-    "${I23dSFM_INCLUDE_DIRS}"
-  )
-ENDIF(I23dSFM_USE_INTERNAL_CERES)
 
-# Create a I23dSFMConfig.cmake file. <name>Config.cmake files are searched by
-# FIND_PACKAGE() automatically. We configure that file so that we can put any
-# information we want in it, e.g. version numbers, include directories, etc.
-CONFIGURE_FILE("${CMAKE_SOURCE_DIR}/cmakeFindModules/I23dSFMConfig.cmake.in"
-               "${CMAKE_CURRENT_BINARY_DIR}/I23dSFMConfig.cmake" @ONLY)
+include_directories(
+    lib
+    src
+    ${COLMAP_INCLUDE_DIRS}
+)
 
-INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/I23dSFMConfig.cmake"
-        DESTINATION share/i23dSFM/cmake)
+link_directories(${COLMAP_LINK_DIRS})
 
+add_subdirectory(lib)
+add_subdirectory(src)
+
+
+################################################################################
+# Generate source groups for Visual Studio, XCode, etc.
+################################################################################
+
+COLMAP_ADD_SOURCE_DIR(lib/FLANN LIB_FLANN_SRCS *.h *.cpp *.hpp *.cu)
+COLMAP_ADD_SOURCE_DIR(lib/Graclus LIB_GRACLUS_SRCS *.h *.c)
+COLMAP_ADD_SOURCE_DIR(lib/LSD LIB_LSD_SRCS *.h *.c)
+COLMAP_ADD_SOURCE_DIR(lib/PBA LIB_PBA_SRCS *.h *.cpp *.cu)
+COLMAP_ADD_SOURCE_DIR(lib/PoissonRecon LIB_POISSON_RECON_SRCS *.h *.cpp *.inl)
+COLMAP_ADD_SOURCE_DIR(lib/SiftGPU LIB_SIFT_GPU_SRCS *.h *.cpp *.cu)
+COLMAP_ADD_SOURCE_DIR(lib/SQLite LIB_SQLITE_SRCS *.h *.c)
+COLMAP_ADD_SOURCE_DIR(lib/VLFeat LIB_VLFEAT_SRCS *.h *.c *.tc)
+
+COLMAP_ADD_SOURCE_DIR(src/base BASE_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/controllers CONTROLLERS_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/estimators ESTIMATORS_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/exe EXE_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/feature FEATURE_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/mvs MVS_SRCS *.h *.cc *.cu)
+COLMAP_ADD_SOURCE_DIR(src/optim OPTIM_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/retrieval RETRIEVAL_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/sfm SFM_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/tools TOOLS_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/ui UI_SRCS *.h *.cc)
+COLMAP_ADD_SOURCE_DIR(src/util UTIL_SRCS *.h *.cc)
+
+# Add all of the source files to a regular library target, as using a custom
+# target does not allow us to set its C++ include directories (and thus
+# intellisense can't find any of the included files).
+add_library(
+    ${COLMAP_SRC_ROOT_FOLDER}
+    ${LIB_FLANN_SRCS}
+    ${LIB_GRACLUS_SRCS}
+    ${LIB_LSD_SRCS}
+    ${LIB_PBA_SRCS}
+    ${LIB_POISSON_RECON_SRCS}
+    ${LIB_SIFT_GPU_SRCS}
+    ${LIB_SQLITE_SRCS}
+    ${LIB_VLFEAT_SRCS}
+    ${BASE_SRCS}
+    ${CONTROLLERS_SRCS}
+    ${ESTIMATORS_SRCS}
+    ${EXE_SRCS}
+    ${FEATURE_SRCS}
+    ${MVS_SRCS}
+    ${OPTIM_SRCS}
+    ${RETRIEVAL_SRCS}
+    ${SFM_SRCS}
+    ${TOOLS_SRCS}
+    ${UI_SRCS}
+    ${UTIL_SRCS}
+)
+
+# Prevent the library from being compiled automatically.
+set_target_properties(
+    ${COLMAP_SRC_ROOT_FOLDER} PROPERTIES
+    EXCLUDE_FROM_ALL 1
+    EXCLUDE_FROM_DEFAULT_BUILD 1)
+
+
+################################################################################
+# Install and uninstall scripts
+################################################################################
+
+# Install header files.
+install(DIRECTORY src/
+        DESTINATION include/colmap
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY lib/
+        DESTINATION include/colmap/lib
+        FILES_MATCHING REGEX ".*[.]h|.*[.]hpp|.*[.]inl")
+
+# Generate and install CMake configuration.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeConfig.cmake.in"
+               "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfig.cmake" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfig.cmake"
+        DESTINATION "share/colmap")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeConfigVersion.cmake.in"
+               "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfigVersion.cmake" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/COLMAPConfigVersion.cmake"
+        DESTINATION "share/colmap")
+
+# Install find_package scripts for dependencies.
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cmake
+        DESTINATION share/colmap
+        FILES_MATCHING PATTERN "Find*.cmake")
+
+# Install batch scripts under Windows.
+if(IS_MSVC)
+    install(FILES "scripts/shell/COLMAP.bat" "scripts/shell/RUN_TESTS.bat"
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                        GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+            DESTINATION "/")
+endif()
+
+# Install application meny entry under Linux/Unix.
+if(UNIX AND NOT APPLE)
+    install(FILES "doc/COLMAP.desktop" DESTINATION "share/applications")
+endif()
+
+# Configure the uninstallation script.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUninstall.cmake.in"
+               "${CMAKE_CURRENT_BINARY_DIR}/CMakeUninstall.cmake"
+               IMMEDIATE @ONLY)
+add_custom_target(uninstall COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/CMakeUninstall.cmake)
+set_target_properties(uninstall PROPERTIES FOLDER ${CMAKE_TARGETS_ROOT_FOLDER})
