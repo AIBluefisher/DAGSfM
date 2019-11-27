@@ -1,4 +1,4 @@
-# Graph Structure from Motion (GSfM)
+# Graph Structure from Motion (GraphSfM)
 [![Join the chat at https://gitter.im/hlzz/libvot](https://badges.gitter.im/hlzz/libvot.svg)](https://gitter.im/GraphSfM/Lobby)
 ![issues](https://img.shields.io/github/issues/AIBluefisher/GraphSfM.svg)
 ![forks](https://img.shields.io/github/forks/AIBluefisher/GraphSfM.svg)
