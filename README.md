@@ -1,4 +1,4 @@
-# Graph Structure from Motion (GSfM)
+# Graph Structure from Motion (GraphSfM)
 [![Join the chat at https://gitter.im/hlzz/libvot](https://badges.gitter.im/hlzz/libvot.svg)](https://gitter.im/GraphSfM/Lobby)
 ![issues](https://img.shields.io/github/issues/AIBluefisher/GraphSfM.svg)
 ![forks](https://img.shields.io/github/forks/AIBluefisher/GraphSfM.svg)
@@ -7,26 +7,22 @@
 
 [中文简介](./docs/README_ch.md)
 
-**Okay, I'm back again!**
-
-~~**A enhanced version of GraphSfM has been released in the new repo: https://github.com/AIBluefisher/EGSfM, and this repo
-would not be maintained any more.**~~
+**A similar version of GraphSfM based on [OpenMVG](https://github.com/openMVG/openMVG) has been released in: https://github.com/AIBluefisher/EGSfM.**
 
 ## 1. Overview of GraphSfM
-Our Structure from Motion approach, named **`Graph Structure from Motion (GraphSfM)`**, is aimed at large scale 3D reconstruction. Besides, we aimed at exploring the computation ability of computer and making SfM easily transferred to distributed system. This work has been reconstructed and now it is based on [COLMAP](https://github.com/colmap/colmap). ~~Our work is partially based on an early version of [OpenMVG](https://github.com/openMVG/openMVG), while more robust and efficient than state-of-the-art open source Structure from Motion approaches.~~
+Our Structure from Motion approach, named **`Graph Structure from Motion (GraphSfM)`**, is aimed at large scale 3D reconstruction. Besides, we aimed at exploring the computation ability of computer and making SfM easily transferred to distributed system. This work has been reconstructed and now it is based on [COLMAP](https://github.com/colmap/colmap).
 
 In our work, 3D reconstruction is deemed as a ```divide-and-conquer``` problem. Our graph cluster algorithm divides images into different clusters, while images with high relativity remained in the same group. After the completion of local SfM in all clusters, an elaborate graph initialization and MST construction algorithm is designed to accurately merge clusters, and cope well with drift problems. The two proposed graph-based algorithms make SfM more efficient and robust - the graph cluster algorithm accelerate the SfM step while guarantee the robustness of clusters merging, and the MST construction makes point clouds alignment as accurate as possible. Our approach can reconstruct large scale data-set in one single machine with very high accuracy and efficiency.
 
 If you use this project for your research, please cite:
 ```
-@article{ChenyuGraphSfM,
-    title={Graph-Based Large Scale Parallel Structure from Motion},
-    author={Yu, Chen and Shuhan, Shen and Yisong Chen}
-}
-
-@article{ZhuParallel,
-  title={Parallel Structure from Motion from Local Increment to Global Averaging},
-  author={Zhu, Siyu and Shen, Tianwei and Zhou, Lei and Zhang, Runze and Wang, Jinglu and Fang, Tian and Quan, Long},
+@misc{chen2019graphbased,
+    title={Graph-Based Parallel Large Scale Structure from Motion},
+    author={Yu Chen and Shuhan Shen and Yisong Chen and Guoping Wang},
+    year={2019},
+    eprint={1912.10659},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
 }
 
 @inproceedings{schoenberger2016sfm,

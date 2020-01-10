@@ -89,7 +89,7 @@ BundleAdjustmentOptions DistributedMapperController::GlobalBundleAdjustment() co
     options.solver_options.minimizer_progress_to_stdout = true;
     options.solver_options.num_threads = -1;
 #if CERES_VERSION_MAJOR < 2
-    options.solver_options.num_linear_solver_threads = num_threads;
+    options.solver_options.num_linear_solver_threads = GetEffectiveNumThreads(-1);
 #endif  // CERES_VERSION_MAJOR
     options.print_summary = true;
     options.refine_focal_length = true;
