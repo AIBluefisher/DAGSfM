@@ -125,6 +125,11 @@ void Reconstruction::SetUp(const CorrespondenceGraph* correspondence_graph)
     }
 }
 
+const CorrespondenceGraph* Reconstruction::GetCorrespondenceGraph() const
+{
+    return correspondence_graph_;
+}
+
 void Reconstruction::TearDown() 
 {
     correspondence_graph_ = nullptr;
@@ -836,6 +841,26 @@ double Reconstruction::ComputeMeanReprojectionError() const
     }
 }
 
+void Reconstruction::ShowReconInfo() const
+{
+    LOG(INFO) << "Cameras number: "
+              << NumCameras();
+    LOG(INFO) << "Registered images number: " 
+              << RegImageIds().size();
+    LOG(INFO) << "Added points3D: "
+              << num_added_points3D_;
+    LOG(INFO) << "Reconstructed 3D points: "
+              << NumPoints3D();
+    LOG(INFO) << "Mean Reprojection Error: "
+              << ComputeMeanReprojectionError();
+    LOG(INFO) << "Observations number: "
+              << ComputeNumObservations();
+    LOG(INFO) << "Mean Track Length: " 
+              << ComputeMeanTrackLength();
+    LOG(INFO) << "Mean Observations Per Image: " 
+              << ComputeMeanObservationsPerRegImage();    
+}
+
 void Reconstruction::Read(const std::string& path) 
 {
     if (ExistsFile(JoinPaths(path, "cameras.bin")) &&
@@ -1303,6 +1328,15 @@ void Reconstruction::ExtractColorsForAllImages(const std::string& path)
     }
 }
 
+void Reconstruction::AssignColorsForAllPoints(BitmapColor<float> color) 
+{
+    const Eigen::Vector3d c(color.r, color.g, color.b);
+    for (auto& point3D : points3D_) {
+        c.unaryExpr(std::ptr_fun<double, double>(std::round));
+        point3D.second.SetColor(c.cast<uint8_t>());
+    }
+}
+
 void Reconstruction::CreateImageDirs(const std::string& path) const 
 {
     std::set<std::string> image_dirs;
@@ -1508,7 +1542,7 @@ void Reconstruction::ReadImagesText(const std::string& path)
 
         std::stringstream line_stream1(line);
 
-        // ID
+        // Image ID
         std::getline(line_stream1, item, ' ');
         const image_t image_id = std::stoul(item);
 
@@ -1517,6 +1551,11 @@ void Reconstruction::ReadImagesText(const std::string& path)
 
         image.SetRegistered(true);
         reg_image_ids_.push_back(image_id);
+
+        // Cluster ID
+        std::getline(line_stream1, item, ' ');
+        const size_t cluster_id = std::stoul(item);
+        image.SetClusterId(cluster_id);
 
         // QVEC (qw, qx, qy, qz)
         std::getline(line_stream1, item, ' ');
@@ -1701,6 +1740,8 @@ void Reconstruction::ReadImagesBinary(const std::string& path)
 
         image.SetImageId(ReadBinaryLittleEndian<image_t>(&file));
 
+        image.SetClusterId(ReadBinaryLittleEndian<size_t>(&file));
+
         image.Qvec(0) = ReadBinaryLittleEndian<double>(&file);
         image.Qvec(1) = ReadBinaryLittleEndian<double>(&file);
         image.Qvec(2) = ReadBinaryLittleEndian<double>(&file);
@@ -1834,6 +1875,8 @@ void Reconstruction::WriteImagesText(const std::string& path) const
 
         line << image.first << " ";
 
+        line << image.second.ClusterId() << " ";
+
         // QVEC (qw, qx, qy, qz)
         const Eigen::Vector4d normalized_qvec =
             NormalizeQuaternion(image.second.Qvec());
@@ -1938,6 +1981,8 @@ void Reconstruction::WriteImagesBinary(const std::string& path) const
         }
 
         WriteBinaryLittleEndian<image_t>(&file, image.first);
+
+        WriteBinaryLittleEndian<size_t>(&file, image.second.ClusterId());
 
         const Eigen::Vector4d normalized_qvec =
             NormalizeQuaternion(image.second.Qvec());

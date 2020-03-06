@@ -36,6 +36,8 @@
 
 #include "util/types.h"
 
+#include <rpc/msgpack.hpp>
+
 namespace colmap {
 
 // Camera class that holds the intrinsic parameters. Cameras may be shared
@@ -142,7 +144,14 @@ class Camera {
   // and the principal point.
   void Rescale(const double scale);
   void Rescale(const size_t width, const size_t height);
-
+  
+  MSGPACK_DEFINE(camera_id_, 
+                 model_id_, 
+                 width_, 
+                 height_, 
+                 params_, 
+                 prior_focal_length_, 
+                 prior_focal_length_);
  private:
   // The unique identifier of the camera. If the identifier is not specified
   // it is set to `kInvalidCameraId`.

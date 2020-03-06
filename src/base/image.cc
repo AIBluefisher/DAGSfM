@@ -43,8 +43,11 @@ static const double kNaN = std::numeric_limits<double>::quiet_NaN();
 
 const int Image::kNumPoint3DVisibilityPyramidLevels = 6;
 
+const size_t Image::kDefaultClusterId = 0;
+
 Image::Image()
     : image_id_(kInvalidImageId),
+      cluster_id_(kDefaultClusterId),
       name_(""),
       camera_id_(kInvalidCameraId),
       registered_(false),

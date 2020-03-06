@@ -36,6 +36,8 @@
 
 #include "util/alignment.h"
 #include "util/types.h"
+#include "map_reduce/msgpack_adaptor.h"
+#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -59,6 +61,9 @@ class Point2D {
   inline point3D_t Point3DId() const;
   inline bool HasPoint3D() const;
   inline void SetPoint3DId(const point3D_t point3D_id);
+  
+  MSGPACK_DEFINE(xy_, point3D_id_);
+//   MSGPACK_DEFINE(point3D_id_);
 
  private:
   // The image coordinates in pixels, starting at upper left corner with 0.

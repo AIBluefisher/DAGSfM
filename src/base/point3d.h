@@ -35,10 +35,12 @@
 #include <vector>
 
 #include <Eigen/Core>
+#include <rpc/msgpack.hpp>
 
 #include "base/track.h"
 #include "util/logging.h"
 #include "util/types.h"
+#include "map_reduce/msgpack_adaptor.h"
 
 namespace colmap {
 
@@ -74,6 +76,8 @@ class Point3D {
   inline const class Track& Track() const;
   inline class Track& Track();
   inline void SetTrack(const class Track& track);
+  
+  MSGPACK_DEFINE(xyz_, color_, error_, track_);
 
  private:
   // The 3D position of the point.

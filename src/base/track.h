@@ -36,6 +36,9 @@
 
 #include "util/logging.h"
 #include "util/types.h"
+#include "map_reduce/msgpack_adaptor.h"
+
+#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -47,6 +50,8 @@ struct TrackElement {
   image_t image_id;
   // The point in the image that the track element is observed.
   point2D_t point2D_idx;
+
+  MSGPACK_DEFINE(image_id, point2D_idx);
 };
 
 class Track {
@@ -81,6 +86,8 @@ class Track {
 
   // Shrink the capacity of track vector to fit its size to save memory.
   inline void Compress();
+  
+  MSGPACK_DEFINE(elements_);
 
  private:
   std::vector<TrackElement> elements_;

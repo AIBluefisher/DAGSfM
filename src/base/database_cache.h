@@ -47,6 +47,8 @@
 #include "util/alignment.h"
 #include "util/types.h"
 
+#include <rpc/msgpack.hpp>
+
 namespace colmap {
 
 // A class that caches the contents of the database in memory, used to quickly
@@ -92,8 +94,12 @@ class DatabaseCache {
             const bool ignore_watermarks,
             const std::unordered_set<std::string>& image_names);
 
+//   void Copy(DatabaseCache& database_cache) const;
+
   // Find specific image by name. Note that this uses linear search.
   const class Image* FindImageWithName(const std::string& name) const;
+  
+  MSGPACK_DEFINE(correspondence_graph_, cameras_, images_);
 
  private:
   class CorrespondenceGraph correspondence_graph_;

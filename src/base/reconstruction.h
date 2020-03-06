@@ -37,15 +37,18 @@
 #include <vector>
 
 #include <Eigen/Core>
+#include <rpc/msgpack.hpp>
 
 #include "base/camera.h"
 #include "base/database.h"
 #include "base/image.h"
 #include "base/point2d.h"
 #include "base/point3d.h"
+#include "base/correspondence_graph.h"
 #include "base/track.h"
 #include "util/alignment.h"
 #include "util/types.h"
+#include "util/bitmap.h"
 
 namespace colmap {
 
@@ -76,7 +79,15 @@ public:
     inline size_t NumImages() const;
     inline size_t NumRegImages() const;
     inline size_t NumPoints3D() const;
+    inline point3D_t NumAddedPoints3D() const;
     inline size_t NumImagePairs() const;
+
+    // Set reconstruction objects.
+    inline void SetCameras(const EIGEN_STL_UMAP(camera_t, class Camera)& cameras);
+    inline void SetImages(const EIGEN_STL_UMAP(image_t, class Image)& images);
+    inline void SetPoints3D(const EIGEN_STL_UMAP(point3D_t, class Point3D)& points3D);
+    inline void SetRegImagesId(const std::vector<image_t>& image_ids);
+    inline void SetNumAddedPoints3D(const point3D_t num_points);
 
     // Get const objects.
     inline const class Camera& Camera(const camera_t camera_id) const;
@@ -117,6 +128,7 @@ public:
     // Setup all relevant data structures before reconstruction. Note the
     // correspondence graph object must live until `TearDown` is called.
     void SetUp(const CorrespondenceGraph* correspondence_graph);
+    const CorrespondenceGraph* GetCorrespondenceGraph() const;
 
     // Finalize the Reconstruction after the reconstruction has finished.
     //
@@ -257,6 +269,7 @@ public:
     double ComputeMeanTrackLength() const;
     double ComputeMeanObservationsPerRegImage() const;
     double ComputeMeanReprojectionError() const;
+    void ShowReconInfo() const;
 
     // Read data from text or binary file. Prefer binary data if it exists.
     void Read(const std::string& path);
@@ -304,9 +317,23 @@ public:
     //                      root path and the name of the image.
     void ExtractColorsForAllImages(const std::string& path);
 
+    // Assign colors for all 3D points by computing the mean color of all images.
+    //
+    // @param path          Absolute or relative path to root folder of image.
+    //                      The image path is determined by concatenating the
+    //                      root path and the name of the image.
+    void AssignColorsForAllPoints(BitmapColor<float> color);
+
     // Create all image sub-directories in the given path.
     void CreateImageDirs(const std::string& path) const;
 
+    MSGPACK_DEFINE(/**correspondence_graph_,*/
+                   cameras_, 
+                   images_, 
+                   points3D_,
+                   /*image_pair_stats_,*/
+                   reg_image_ids_, 
+                   num_added_points3D_);
 private:
     size_t FilterPoints3DWithSmallTriangulationAngle(
         const double min_tri_angle,
@@ -361,6 +388,8 @@ size_t Reconstruction::NumImages() const { return images_.size(); }
 size_t Reconstruction::NumRegImages() const { return reg_image_ids_.size(); }
 
 size_t Reconstruction::NumPoints3D() const { return points3D_.size(); }
+
+point3D_t Reconstruction::NumAddedPoints3D() const { return num_added_points3D_; }
 
 size_t Reconstruction::NumImagePairs() const 
 {
@@ -421,6 +450,31 @@ Reconstruction::ImagePairStat& Reconstruction::ImagePair(
 {
     const auto pair_id = Database::ImagePairToPairId(image_id1, image_id2);
     return image_pair_stats_.at(pair_id);
+}
+
+void Reconstruction::SetCameras(const EIGEN_STL_UMAP(camera_t, class Camera)& cameras)
+{
+    cameras_ = std::move(cameras);
+}
+
+void Reconstruction::SetImages(const EIGEN_STL_UMAP(image_t, class Image)& images)
+{
+    images_ = std::move(images);
+}
+
+void Reconstruction::SetPoints3D(const EIGEN_STL_UMAP(point3D_t, class Point3D)& points3D)
+{
+    points3D_ = std::move(points3D);
+}
+
+void Reconstruction::SetRegImagesId(const std::vector<image_t>& image_ids)
+{
+    reg_image_ids_ = image_ids;
+}
+
+void Reconstruction::SetNumAddedPoints3D(const point3D_t num_points)
+{
+    num_added_points3D_ = num_points;
 }
 
 const EIGEN_STL_UMAP(camera_t, Camera) & Reconstruction::Cameras() const 

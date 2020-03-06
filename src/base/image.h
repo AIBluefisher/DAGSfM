@@ -45,6 +45,9 @@
 #include "util/logging.h"
 #include "util/math.h"
 #include "util/types.h"
+#include "map_reduce/msgpack_adaptor.h"
+
+#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -67,6 +70,10 @@ class Image {
   // Access the unique identifier of the image.
   inline image_t ImageId() const;
   inline void SetImageId(const image_t image_id);
+
+  // Access the unique cluster identifier of the image.
+  inline size_t ClusterId() const;
+  inline void SetClusterId(const size_t cluster_id);
 
   // Access the name of the image.
   inline const std::string& Name() const;
@@ -209,9 +216,36 @@ class Image {
   // The number of levels in the 3D point multi-resolution visibility pyramid.
   static const int kNumPoint3DVisibilityPyramidLevels;
 
+  // The default cluster id that images belong to.
+  static const size_t kDefaultClusterId;
+
+  MSGPACK_DEFINE(image_id_, 
+                 cluster_id_, 
+                 name_, 
+                 camera_id_, 
+                 registered_, 
+                 num_points3D_,
+                 num_points3D_,
+                 num_observations_,
+                 num_correspondences_,
+                 num_visible_points3D_,
+                 angle_axis_,
+                 qvec_,
+                 tvec_,
+                 qvec_prior_,
+                 tvec_prior_,
+                 points2D_,
+                 colors2D_,
+                 visible_tracks_,
+                 num_correspondences_have_point3D_);
+
  private:
   // Identifier of the image, if not specified `kInvalidImageId`.
   image_t image_id_;
+
+  // Identifier of the cluster that the current image belongs to, 
+  // if not specified 'kDefaultClusterId'
+  size_t cluster_id_;
 
   // The name of the image, i.e. the relative path.
   std::string name_;
@@ -270,6 +304,10 @@ class Image {
 image_t Image::ImageId() const { return image_id_; }
 
 void Image::SetImageId(const image_t image_id) { image_id_ = image_id; }
+
+size_t Image::ClusterId() const { return cluster_id_; }
+
+void Image::SetClusterId(const size_t cluster_id) { cluster_id_ = cluster_id; }
 
 const std::string& Image::Name() const { return name_; }
 

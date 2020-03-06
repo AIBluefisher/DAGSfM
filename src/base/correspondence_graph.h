@@ -38,6 +38,8 @@
 #include "base/database.h"
 #include "util/types.h"
 
+#include <rpc/msgpack.hpp>
+
 namespace colmap {
 
 // Scene graph represents the graph of image to image and feature to feature
@@ -55,6 +57,8 @@ class CorrespondenceGraph {
 
     // The index of the corresponding point in the corresponding image.
     point2D_t point2D_idx;
+
+    MSGPACK_DEFINE(image_id, point2D_idx);
   };
 
   CorrespondenceGraph();
@@ -130,6 +134,8 @@ class CorrespondenceGraph {
   // observation as its only correspondence.
   bool IsTwoViewObservation(const image_t image_id,
                             const point2D_t point2D_idx) const;
+  
+  MSGPACK_DEFINE(images_, image_pairs_);
 
  private:
   struct Image {
@@ -142,11 +148,15 @@ class CorrespondenceGraph {
 
     // Correspondences to other images per image point.
     std::vector<std::vector<Correspondence>> corrs;
+
+    MSGPACK_DEFINE(num_observations, num_correspondences, corrs);
   };
 
   struct ImagePair {
     // The number of correspondences between pairs of images.
     point2D_t num_correspondences = 0;
+
+    MSGPACK_DEFINE(num_correspondences);
   };
 
   EIGEN_STL_UMAP(image_t, Image) images_;
