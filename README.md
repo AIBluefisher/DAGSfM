@@ -5,7 +5,6 @@
 ![stars](https://img.shields.io/github/stars/AIBluefisher/GraphSfM.svg)
 ![license](https://img.shields.io/github/license/AIBluefisher/GraphSfM.svg)
 
-[中文简介](./docs/README_ch.md)
 
 **A similar version of GraphSfM based on [OpenMVG](https://github.com/openMVG/openMVG) has been released in: https://github.com/AIBluefisher/EGSfM.**
 
@@ -37,6 +36,7 @@ If you use this project for your research, please cite:
 
 ### 2.1 Required
 
+#### Basic Requirements
 ```
 sudo apt-get install \
     git \
@@ -60,7 +60,8 @@ sudo apt-get install \
     libcgal-qt5-dev
 ```
 
-Then install [ceres-solver]()
+#### [ceres-solver]()
+
 ```sh
 sudo apt-get install libatlas-base-dev libsuitesparse-dev
 git clone https://ceres-solver.googlesource.com/ceres-solver
@@ -73,12 +74,13 @@ make
 sudo make install
 ```
 
+#### [rpclib](https://github.com/qchateau/rpclib)
+
 Build our GraphSfM
 ```sh
-git clone https://github.com/AIBluefisher/GraphSfM.git
-cd GraphSfM
-mkdir build
-cd build
+git clone https://github.com/qchateau/rpclib.git
+cd rpclib
+mkdir build && cd build
 cmake ..
 make -j8
 sudo make install
@@ -87,7 +89,9 @@ sudo make install
 ## 3. Usage
 
 As our algorithm is not integrated in the `GUI` of `COLMAP`, we offer a script to run the 
-distributed SfM (We hope there is anyone that is interested in integrating this pipeline into the GUI):
+distributed SfM (We hope there is anyone that is interested in integrating this pipeline into the GUI).
+
+### Sequential Mode
 ```sh
 sudo chmod +x scripts/shell/distributed_sfm.sh
 ./distributed_sfm.sh $image_dir $num_images_ub $log_folder $completeness_ratio
@@ -97,6 +101,40 @@ sudo chmod +x scripts/shell/distributed_sfm.sh
 - ```$log_folder```:  The directory that stores the logs
 - ```$completeness_ratio```: The ratio that measure the repeatitive rate of adjacent clusters.
 
+### Distributed Mode
+(1) At first, we need to establish the server for every worker: 
+```sh
+cd build/src/exe
+./colmap local_sfm_worker --output_path=$output_path
+```
+
+(2) Then, the ip and port for every server should be written in a `config.txt` file.
+The file format should follow:
+```txt
+server_num
+ip1 port1
+ip2 port2
+... ...
+```
+
+(3) At last, start our master
+```sh
+# The project folder must contain a folder "images" with all the images.
+DATASET_PATH=/path/to/project
+CONFIG_FILE_PATH=/path/to/config.txt
+
+./colmap distributed_mapper $DATASET_PATH/Master \
+                            --database_path=$DATASET_PATH/database.db \
+                            --image_path=$DATASET_PATH/images \
+                            --output_path=$DATASET_PATH/Master \
+                            --distributed=1 \
+                            --config_file_name=$CONFIG_FILE_PATH \ 
+                            --num_images_ub=$num_images_ub \
+                            --graph_dir=$output_path \
+                            --cluster_type=NCUT \
+                            --num_workers=8
+```
+
 If succeed, camera poses and sparse points should be included in `$DATASET/sparse` folder, you can use COLMAP's GUI to 
 import it and show the visual result:
 ```sh
@@ -105,6 +143,16 @@ import it and show the visual result:
 For small scale reconstruction, you can set the `$num_images_ub` equal to the number of images, the program would just use the incremental SfM pipeline of [COLMAP](https://github.com/colmap/colmap).
 
 For large scale reconstruction, our `GraphSfM` is highly recommended, these parameters should be tuned carefully: larger `$num_images_ub` and `$completeness_ratio` can make reconstruction more robust, but also may lead to low efficiency and even degenerate to incremental one.
+
+## ChangeLog
+
+- 2020.03.06
+    - map reduce implementation for distributed Structure-from-Motion.
+
+- 2019.11.26
+    - Image Clustering algorithms: NCut, Spectral Clustering (Upcoming)
+    - Graph-based sub-reconstruction Merging algorithm
+
 
 ## Licence
 
