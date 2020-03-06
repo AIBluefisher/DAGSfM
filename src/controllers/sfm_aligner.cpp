@@ -1,5 +1,6 @@
 #include <limits>
 #include <vector>
+#include <memory>
 #include <unordered_map>
 
 #include "controllers/sfm_aligner.h"
@@ -9,13 +10,26 @@
 #include "optim/bundle_adjustment.h"
 #include "util/timer.h"
 #include "math/util.h"
+#include "sfm/incremental_triangulator.h"
+#include "solver/l1_solver.h"
+#include "base/similarity_transform.h"
+#include "util/reconstruction_io.h"
+#include "util/misc.h"
 
 #include <glog/logging.h>
 #include <Eigen/Geometry>
 #include <ceres/rotation.h>
+#include <Eigen/Cholesky>
+#include <Eigen/SparseCholesky>
+#include <Eigen/SparseCore>
+#include <ceres/problem.h>
+#include <ceres/solver.h>
+#include <ceres/cost_function.h>
+
+
 
 namespace GraphSfM {
-
+namespace {
 double MeanReprojectionResiduals(const std::vector<double>& residuals)
 {
     double mean_residual = 0.0;
@@ -40,6 +54,161 @@ std::vector<double> ComputeReprojectionResiduals(const std::vector<Eigen::Vector
     return residuals;
 }
 
+double CheckReprojError(const vector<Eigen::Vector3d>& src_observations,
+                        const vector<Eigen::Vector3d>& dst_observations,
+                        const double& scale,
+                        const Eigen::Matrix3d& R,
+                        const Eigen::Vector3d& t)
+{
+    double reproj_err = 0.0;
+    const int size = src_observations.size();
+    for (int i = 0; i < size; i++) {
+        Eigen::Vector3d reproj_obv = scale * R * src_observations[i] + t;
+        reproj_err += (reproj_obv - dst_observations[i]).norm();
+    }
+
+    LOG(INFO) << "Mean Reprojection Error: " << reproj_err / size
+              << " (" << reproj_err << "/" 
+              << size << ")";
+    return reproj_err / size;
+}
+
+void FindSimilarityTransform(const std::vector<Eigen::Vector3d>& observations1,
+                             const std::vector<Eigen::Vector3d>& observations2,
+                             const double threshold,
+                             const double p,
+                             Eigen::Matrix3d& R,
+                             Eigen::Vector3d& t,
+                             double& scale,
+                             double& msd)
+{
+    std::vector<Eigen::Vector3d> inliers1, inliers2;
+
+    if (observations1.size() > 5) {
+        LOG(INFO) << "Finding Similarity by RANSAC";
+        RansacSimilarity(observations1, observations2, 
+                         inliers1, inliers2, 
+                         R, t, scale, 
+                         threshold, p);
+        VLOG(2) << "inliers size: " << inliers1.size();
+        // Re-compute similarity by inliers
+        Eigen::MatrixXd x1 = Eigen::MatrixXd::Zero(3, inliers1.size()),
+                        x2 = Eigen::MatrixXd::Zero(3, inliers2.size());
+        for(uint i = 0; i < inliers1.size(); i++) {
+            x1.col(i) = inliers1[i];
+            x2.col(i) = inliers2[i];
+        }
+        GraphSfM::FindRTS(x1, x2, &scale, &t, &R);
+        // Optional non-linear refinement of the found parameters
+        GraphSfM::Refine_RTS(x1, x2, &scale, &t, &R);
+
+        if (inliers1.size() < 4) { msd = numeric_limits<double>::max(); return; }
+        // else msd = CheckReprojError(inliers1, inliers2, scale, R, t);
+    }
+
+    if (observations1.size() <= 5 || inliers1.size() <= 5) {
+        Eigen::MatrixXd x1 = Eigen::MatrixXd::Zero(3, observations1.size()),
+                        x2 = Eigen::MatrixXd::Zero(3, observations2.size());
+        for (uint i = 0; i < observations1.size(); i++) {
+            x1.col(i) = observations1[i];
+            x2.col(i) = observations2[i];
+        }
+        GraphSfM::FindRTS(x1, x2, &scale, &t, &R);
+        GraphSfM::Refine_RTS(x1, x2, &scale, &t, &R);
+        
+        // msd = CheckReprojError(observations1, observations2, scale, R, t);
+    }
+
+    msd = CheckReprojError(observations1, observations2, scale, R, t);
+}
+
+double CheckAngularResidual(const std::vector<Eigen::Matrix3d>& src_rotations,
+                           const std::vector<Eigen::Matrix3d>& dst_rotations,
+                           const Eigen::Matrix3d& R)
+{
+    double angular_residual = 0.0;
+    const uint n = src_rotations.size();
+    for (uint i = 0; i < n; i++) {
+        Eigen::Matrix3d rel_rotation = 
+            dst_rotations[i].transpose() * src_rotations[i] * R.transpose();
+        Eigen::Vector3d angle_axis;
+        ceres::RotationMatrixToAngleAxis(rel_rotation.data(), angle_axis.data());
+        angular_residual += RadToDeg(angle_axis.norm());
+    }
+
+    angular_residual /= n;
+    LOG(INFO) << "Average Angular Residual: " << angular_residual << " degree.";
+    return angular_residual;
+}
+
+bool ComputeSimilarityByCameraMotions(
+    std::vector<Eigen::Vector3d>& camera_centers1,
+    std::vector<Eigen::Vector3d>& camera_centers2,
+    std::vector<Eigen::Matrix3d>& camera_rotations1,
+    std::vector<Eigen::Matrix3d>& camera_rotations2,
+    Eigen::Matrix3d& relative_r,
+    Eigen::Vector3d& relative_t,
+    double& scale)
+{
+    // my hybrid approach by combining "Divide and Conquer: Efficient Large-Scale
+    // Structure from Motion Using Graph Partitioning" and RANSAC
+
+    const uint n = camera_centers1.size();
+    std::vector<Eigen::Vector3d> ts1(n);
+    std::vector<Eigen::Vector3d> ts2(n);
+
+    for (uint i = 0; i < n; i++) {
+        ts1[i] = -camera_rotations1[i] * camera_centers1[i];
+        ts2[i] = -camera_rotations2[i] * camera_centers2[i];
+    }
+
+    // compute relative scale from a->b
+    std::vector<double> scales;
+    for (uint i = 0; i < n; i++) {
+        Eigen::Vector3d center_a1 = camera_centers1[i];
+        Eigen::Vector3d center_b1 = camera_centers2[i];
+        for (uint j = i + 1; j < n; j++) {
+            Eigen::Vector3d center_a2 = camera_centers1[j];
+            Eigen::Vector3d center_b2 = camera_centers2[j];
+            double scale_ab = (center_b1 - center_b2).norm() / 
+                             (center_a1 - center_a2).norm();
+            scales.push_back(scale_ab);
+        }
+    }
+    // retrieve the median of scales, according to 
+    // the equation (5) of the paper "Divide and Conquer: Efficient Large-Scale
+    // Structure from Motion Using Graph Partitioning" 
+    std::sort(scales.begin(), scales.end());
+    scale = scales[scales.size() / 2];
+
+    // compute relative rotation & relative translation from a->b
+    std::vector<Correspondence3D> corres3d;
+    std::vector<CorrespondenceEuc> input_datas;
+    for (uint i = 0; i < camera_centers1.size() ;i++) {
+        corres3d.emplace_back(camera_centers1[i], camera_centers2[i]);
+        input_datas.push_back(make_pair(Euclidean3D(camera_rotations1[i], ts1[i]),
+                                        Euclidean3D(camera_rotations2[i], ts2[i])));
+    }
+    EuclideanEstimator euc_estimator(scale, corres3d);
+    
+    Euclidean3D euc3d;
+    RansacParameters params;
+    params.rng = std::make_shared<RandomNumberGenerator>((unsigned int)time(NULL));
+    params.error_thresh = 0.002;
+    params.max_iterations = 1000;
+    
+    Prosac<EuclideanEstimator> prosac_euc3(params, euc_estimator);
+    prosac_euc3.Initialize();
+    RansacSummary summary;
+    prosac_euc3.Estimate(input_datas, &euc3d, &summary);
+
+    relative_r = euc3d.R;
+    relative_t = euc3d.t;
+
+    return true;
+}
+} // namespace
+
 SfMAligner::SfMAligner(const std::vector<Reconstruction*>& reconstructions,
                        const BundleAdjustmentOptions& ba_options)
      : reconstructions_(reconstructions),
@@ -56,10 +225,19 @@ SfMAligner::SfMAligner(const std::vector<Reconstruction*>& reconstructions,
     }
 }
 
+const std::vector<BitmapColor<float>> SfMAligner::ColorContainers = { 
+    BitmapColor<float>(255, 25.5, 0), BitmapColor<float>(0, 255, 255),
+    BitmapColor<float>(255, 102, 0), BitmapColor<float>(153, 51, 204),
+    BitmapColor<float>(0, 255, 51), BitmapColor<float>(255, 0, 204),
+    BitmapColor<float>(255, 255, 0), BitmapColor<float>(255, 153, 255), 
+    BitmapColor<float>(255, 51, 0), BitmapColor<float>(0, 204, 255),
+    BitmapColor<float>(255, 204, 255)
+};
+
 bool SfMAligner::Align()
 {
     // 1. Constructing a graph from reconstructions,
-    // each node is a reconstruction, edges represents the connections between 
+    // each node is a reconstruction, edges represent the connections between 
     // reconstructions (by the means of common images or common 3D points), the weight
     // of edge represents the mean reprojection error.
     LOG(INFO) << "Constructing Reconstructions Graph...";
@@ -80,9 +258,6 @@ bool SfMAligner::Align()
     // most accurate n - 1 edges for accurate alignment.
     LOG(INFO) << "Finding Minimum Spanning Tree...";
     std::vector<Edge> mst_edges = recons_graph_.Kruskal();
-    if (mst_edges.size() < recons_graph_.GetNodesNum() - 1) {
-        return false;
-    }
 
     Graph<Node, Edge> mst;
     for (auto node : recons_graph_.GetNodes()) {
@@ -90,6 +265,12 @@ bool SfMAligner::Align()
     }
     for (const auto edge : mst_edges) {
         mst.AddEdge(edge);
+    }
+
+    if (mst_edges.size() < recons_graph_.GetNodesNum() - 1) {
+        LOG(WARNING) << "Invalid MST";
+        mst.ShowInfo();
+        return false;
     }
     mst.ShowInfo();
 
@@ -101,7 +282,7 @@ bool SfMAligner::Align()
     // 4. Compute the final transformation to anchor node for each cluster
     LOG(INFO) << "Computing Final Similarity Transformations...";
     for (uint i = 0; i < reconstructions_.size(); i++) {
-        if (i != anchor_node_.id) {
+        if (static_cast<int>(i) != anchor_node_.id) {
             this->ComputePath(i, anchor_node_.id);
         }
     }
@@ -111,9 +292,23 @@ bool SfMAligner::Align()
     LOG(INFO) << "Merging Reconstructions...";
     this->MergeReconstructions();
 
-    // 6. Final Bundle Adjustment
-    LOG(INFO) << "Final Global Bundle Adjustment";
-    this->AdjustGlobalBundle();
+    // 6. Re-triangulation
+    if (options_.retriangulate) {
+        LOG(INFO) << "Re-triangulating...";
+
+        std::unique_ptr<IncrementalTriangulator> triangulator;
+        triangulator.reset(new IncrementalTriangulator(
+                reconstructions_[anchor_node_.id]->GetCorrespondenceGraph(), 
+                reconstructions_[anchor_node_.id]));
+        IncrementalTriangulator::Options triangulator_options;
+        triangulator->Retriangulate(triangulator_options);
+    }
+
+    // 7. Final Bundle Adjustment
+    if (options_.final_ba) {
+        LOG(INFO) << "Final Global Bundle Adjustment";
+        this->AdjustGlobalBundle();
+    }
 
     return true;
 }
@@ -176,7 +371,7 @@ double SfMAligner::ComputeEdgeWeight(const uint i, const uint j)
     if (common_reg_images.size() < 2) {
         LOG(WARNING) << "Not found enough common registered images.";
         return std::numeric_limits<double>::max();
-    } else if (common_reg_images.size() < 5) {
+    } else if (common_reg_images.size() > 1) {
         ComputeSimilarityByCameraMotions(src_points, ref_points, 
                                          src_rotations, ref_rotations, R1, t1, s1);
         ComputeSimilarityByCameraMotions(ref_points, src_points, 
@@ -185,14 +380,15 @@ double SfMAligner::ComputeEdgeWeight(const uint i, const uint j)
         double msd1 = CheckReprojError(src_points, ref_points, s1, R1, t1),
                msd2 = CheckReprojError(ref_points, src_points, s2, R2, t2);
 
-        // angular residual should be considered
-        const double angular_residual1 = 
-            CheckAngularResidual(src_rotations, ref_rotations, R1);
-        const double angular_residual2 = 
-            CheckAngularResidual(ref_rotations, src_rotations, R2);
+        // // angular residual should be considered
+        // const double angular_residual1 = 
+        //     CheckAngularResidual(src_rotations, ref_rotations, R1);
+        // const double angular_residual2 = 
+        //     CheckAngularResidual(ref_rotations, src_rotations, R2);
 
-        weight = std::max(std::max(msd1, msd2), 
-                          std::max(angular_residual1, angular_residual2));
+        weight = std::max(msd1, msd2);
+        // weight = std::max(std::max(msd1, msd2), 
+        //                   std::max(angular_residual1, angular_residual2));
 
         if (weight != numeric_limits<double>::max()) {
             sim3_graph_[i][j] = Sim3(R1, t1, s1);
@@ -200,17 +396,22 @@ double SfMAligner::ComputeEdgeWeight(const uint i, const uint j)
         }
     } else {
         double msd1 = 0.0, msd2 = 0.0;
-        FindSimilarityTransform(src_points, ref_points, R1, t1, s1, msd1);
-        FindSimilarityTransform(ref_points, src_points, R2, t2, s2, msd2);
+        FindSimilarityTransform(src_points, ref_points, 
+                                options_.threshold, options_.confidence, 
+                                R1, t1, s1, msd1);
+        FindSimilarityTransform(ref_points, src_points,
+                                options_.threshold, options_.confidence, 
+                                R2, t2, s2, msd2);
 
-        // angular residual should be considered
-        const double angular_residual1 = 
-            CheckAngularResidual(src_rotations, ref_rotations, R1);
-        const double angular_residual2 = 
-            CheckAngularResidual(ref_rotations, src_rotations, R2);
+        // // angular residual should be considered
+        // const double angular_residual1 = 
+        //     CheckAngularResidual(src_rotations, ref_rotations, R1);
+        // const double angular_residual2 = 
+        //     CheckAngularResidual(ref_rotations, src_rotations, R2);
 
-        weight = std::max(std::max(msd1, msd2), 
-                          std::max(angular_residual1, angular_residual2));
+        weight = std::max(msd1, msd2);
+        // weight = std::max(std::max(msd1, msd2), 
+                        //   std::max(angular_residual1, angular_residual2));
 
         if (weight != numeric_limits<double>::max()) {
             sim3_graph_[i][j] = Sim3(R1, t1, s1);
@@ -218,7 +419,9 @@ double SfMAligner::ComputeEdgeWeight(const uint i, const uint j)
         }
     }
 
-    return weight;
+    return (weight > options_.max_reprojection_error) ? 
+                     std::numeric_limits<double>::max() :
+                     weight;
 }
 
 void SfMAligner::FindAnchorNode(Graph<Node, Edge>* graph)
@@ -241,7 +444,7 @@ void SfMAligner::FindAnchorNode(Graph<Node, Edge>* graph)
         std::unordered_map<size_t, size_t> degrees = graph->GetDegrees();
 
         // Finding all leaf nodes. Leaf node in graph has degree equals to 1.
-        std::vector<int> indexes;
+        std::vector<size_t> indexes;
         if (graph->GetNodesNum() == 2) {
             indexes.push_back(degrees.begin()->first);
         } else {
@@ -254,7 +457,7 @@ void SfMAligner::FindAnchorNode(Graph<Node, Edge>* graph)
         if (indexes.empty()) break;
 
         for (auto idx : indexes) {
-            if (idx == -1) break;
+            // if (idx == -1) break;
             const Edge& edge = graph->FindConnectedEdge(idx);
 
             LOG(INFO) << "Find node [degree = 1]: " << idx;
@@ -263,8 +466,6 @@ void SfMAligner::FindAnchorNode(Graph<Node, Edge>* graph)
             // src is the node with degree = 1
             uint src = (idx == edge.src) ? edge.src : edge.dst;
             uint dst = (idx == edge.src) ? edge.dst : edge.src;
-            Reconstruction* src_recon = reconstructions_[src];
-            Reconstruction* dst_recon = reconstructions_[dst];
 
             LOG(INFO) << "Merge Clusters: " << src << "->" << dst << ": " << edge.weight;
             anchor_index = dst;
@@ -313,8 +514,20 @@ void SfMAligner::ComputePath(int src, int dst)
 
 void SfMAligner::MergeReconstructions()
 {
+    if (options_.assign_color_for_clusters) {
+        for (size_t i = 0; i < reconstructions_.size(); i++) {
+            reconstructions_[i]->AssignColorsForAllPoints(SfMAligner::ColorContainers[i]);
+            // // Assign cluster id for each image.
+            // const std::vector<image_t> reg_image_ids = reconstructions_[i]->RegImageIds();
+            // for (auto image_id : reg_image_ids) {
+            //     Image& image = reconstructions_[i]->Image(image_id);
+            //     image.SetClusterId(i);
+            // }
+        }
+    }
+
     for (uint i = 0; i < reconstructions_.size(); i++) {
-        if (i == anchor_node_.id) { continue; }
+        if (static_cast<int>(i) == anchor_node_.id) { continue; }
 
         Sim3 sim3 = sim3_to_anchor_[i];
         Eigen::Matrix3x4d alignment;
@@ -362,170 +575,6 @@ bool SfMAligner::AdjustGlobalBundle()
     return true;
 }
 
-void FindSimilarityTransform(const std::vector<Eigen::Vector3d>& observations1,
-                             const std::vector<Eigen::Vector3d>& observations2,
-                             Eigen::Matrix3d& R,
-                             Eigen::Vector3d& t,
-                             double& scale,
-                             double& msd)
-{
-    std::vector<Eigen::Vector3d> inliers1, inliers2;
-    double threshold = 0.1; // TODO: (chenyu) make this parameter an user option
-    double p = 0.99;
 
-    if (observations1.size() > 5) {
-        LOG(INFO) << "Finding Similarity by RANSAC";
-        RansacSimilarity(observations1, observations2, inliers1, inliers2, R, t, scale, threshold, p);
-        VLOG(2) << "inliers size: " << inliers1.size();
-        // Re-compute similarity by inliers
-        Eigen::MatrixXd x1 = Eigen::MatrixXd::Zero(3, inliers1.size()),
-                        x2 = Eigen::MatrixXd::Zero(3, inliers2.size());
-        for(int i = 0; i < inliers1.size(); i++) {
-            x1.col(i) = inliers1[i];
-            x2.col(i) = inliers2[i];
-        }
-        GraphSfM::FindRTS(x1, x2, &scale, &t, &R);
-        // Optional non-linear refinement of the found parameters
-        GraphSfM::Refine_RTS(x1, x2, &scale, &t, &R);
-
-        if (inliers1.size() < 4) { msd = numeric_limits<double>::max(); return; }
-        // else msd = CheckReprojError(inliers1, inliers2, scale, R, t);
-    }
-
-    if (observations1.size() <= 5 || inliers1.size() <= 5) {
-        Eigen::MatrixXd x1 = Eigen::MatrixXd::Zero(3, observations1.size()),
-                        x2 = Eigen::MatrixXd::Zero(3, observations2.size());
-        for (int i = 0; i < observations1.size(); i++) {
-            x1.col(i) = observations1[i];
-            x2.col(i) = observations2[i];
-        }
-        GraphSfM::FindRTS(x1, x2, &scale, &t, &R);
-        GraphSfM::Refine_RTS(x1, x2, &scale, &t, &R);
-        
-        // msd = CheckReprojError(observations1, observations2, scale, R, t);
-    }
-
-    msd = CheckReprojError(observations1, observations2, scale, R, t);
-
-    // LOG(INFO) << "scale: " << scale;
-    // LOG(INFO) << "rotation: ";
-    // LOG(INFO) << R(0, 0) << " " << R(0, 1) << " " << R(0, 2);
-    // LOG(INFO) << R(1, 0) << " " << R(1, 1) << " " << R(1, 2);
-    // LOG(INFO) << R(2, 0) << " " << R(2, 1) << " " << R(2, 2);
-    // LOG(INFO) << "translation: " << t[0] << ", " << t[1] << ", " << t[2];
-}
-
-double CheckReprojError(const vector<Eigen::Vector3d>& src_observations,
-                        const vector<Eigen::Vector3d>& dst_observations,
-                        const double& scale,
-                        const Eigen::Matrix3d& R,
-                        const Eigen::Vector3d& t)
-{
-    double reproj_err = 0.0;
-    const int size = src_observations.size();
-    for (int i = 0; i < size; i++) {
-        Eigen::Vector3d reproj_obv = scale * R * src_observations[i] + t;
-        reproj_err += (reproj_obv - dst_observations[i]).norm();
-    }
-
-    LOG(INFO) << "Mean Reprojection Error: " << reproj_err / size
-              << " (" << reproj_err << "/" 
-              << size << ")";
-    return reproj_err / size;
-}
-
-double CheckAngularResidual(const std::vector<Eigen::Matrix3d>& src_rotations,
-                           const std::vector<Eigen::Matrix3d>& dst_rotations,
-                           const Eigen::Matrix3d& R)
-{
-    double angular_residual = 0.0;
-    const int n = src_rotations.size();
-    for (uint i = 0; i < n; i++) {
-        Eigen::Matrix3d rel_rotation = 
-            dst_rotations[i].transpose() * src_rotations[i] * R.transpose();
-        Eigen::Vector3d angle_axis;
-        ceres::RotationMatrixToAngleAxis(rel_rotation.data(), angle_axis.data());
-        angular_residual += RadToDeg(angle_axis.norm());
-    }
-
-    angular_residual /= n;
-    LOG(INFO) << "Average Angular Residual: " << angular_residual << " degree.";
-    return angular_residual;
-}
-
-bool ComputeSimilarityByCameraMotions(
-    std::vector<Eigen::Vector3d>& camera_centers1,
-    std::vector<Eigen::Vector3d>& camera_centers2,
-    std::vector<Eigen::Matrix3d>& camera_rotations1,
-    std::vector<Eigen::Matrix3d>& camera_rotations2,
-    Eigen::Matrix3d& relative_r,
-    Eigen::Vector3d& relative_t,
-    double& scale)
-{
-    // my hybrid approach by combining "Divide and Conquer: Efficient Large-Scale
-    // Structure from Motion Using Graph Partitioning" and RANSAC
-
-    const int n = camera_centers1.size();
-    std::vector<Eigen::Vector3d> ts1(n);
-    std::vector<Eigen::Vector3d> ts2(n);
-
-    for (uint i = 0; i < n; i++) {
-        ts1[i] = -camera_rotations1[i] * camera_centers1[i];
-        ts2[i] = -camera_rotations2[i] * camera_centers2[i];
-    }
-
-    // compute relative scale from a->b
-    std::vector<double> scales;
-    for (int i = 0; i < n; i++) {
-        Eigen::Vector3d center_a1 = camera_centers1[i];
-        Eigen::Vector3d center_b1 = camera_centers2[i];
-        for (int j = i + 1; j < n; j++) {
-            Eigen::Vector3d center_a2 = camera_centers1[j];
-            Eigen::Vector3d center_b2 = camera_centers2[j];
-            double scale_ab = (center_b1 - center_b2).norm() / 
-                             (center_a1 - center_a2).norm();
-            scales.push_back(scale_ab);
-        }
-    }
-    // retrieve the median of scales, according to 
-    // the equation (5) of the paper "Divide and Conquer: Efficient Large-Scale
-    // Structure from Motion Using Graph Partitioning" 
-    std::sort(scales.begin(), scales.end());
-    scale = scales[scales.size() / 2];
-
-    // compute relative rotation & relative translation from a->b
-    std::vector<Correspondence3D> corres3d;
-    std::vector<CorrespondenceEuc> input_datas;
-    for (int i = 0; i < camera_centers1.size() ;i++) {
-        corres3d.emplace_back(camera_centers1[i], camera_centers2[i]);
-        input_datas.push_back(make_pair(Euclidean3D(camera_rotations1[i], ts1[i]),
-                                        Euclidean3D(camera_rotations2[i], ts2[i])));
-    }
-    EuclideanEstimator euc_estimator(scale, corres3d);
-    
-    Euclidean3D euc3d;
-    RansacParameters params;
-    params.rng = std::make_shared<RandomNumberGenerator>((unsigned int)time(NULL));
-    params.error_thresh = 0.002;
-    params.max_iterations = 1000;
-    
-    Prosac<EuclideanEstimator> prosac_euc3(params, euc_estimator);
-    prosac_euc3.Initialize();
-    RansacSummary summary;
-    prosac_euc3.Estimate(input_datas, &euc3d, &summary);
-
-    relative_r = euc3d.R;
-    relative_t = euc3d.t;
-    
-    // LOG(INFO) << "scale: " << scale;
-    // LOG(INFO) << "rotation: \n";
-    // LOG(INFO) << relative_r(0, 0) << " " << relative_r(0, 1) << " " << relative_r(0, 2);
-    // LOG(INFO) << relative_r(1, 0) << " " << relative_r(1, 1) << " " << relative_r(1, 2);
-    // LOG(INFO) << relative_r(2, 0) << " " << relative_r(2, 1) << " " << relative_r(2, 2);
-    // LOG(INFO) << "translation: " 
-            //   << relative_t[0] << ", " << relative_t[1] << ", " << relative_t[2];
-
-    return true;
-}
 
 } // namespace GraphSfM

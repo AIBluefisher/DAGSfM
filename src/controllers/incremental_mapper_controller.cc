@@ -298,19 +298,84 @@ IncrementalMapperController::IncrementalMapperController(
       image_path_(image_path),
       database_path_(database_path),
       reconstruction_manager_(reconstruction_manager) {
-  CHECK(options_->Check());
-  RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
-  RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
-  RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+    CHECK(options_->Check());
+    RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
+    RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
+    RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+}
+
+IncrementalMapperController::IncrementalMapperController(const IncrementalMapperOptions* options,
+                                                         ReconstructionManager* reconstruction_manager)
+    : options_(options),
+      database_cache_(nullptr),
+      reconstruction_manager_(reconstruction_manager)
+{
+    CHECK(options_->Check());
+    RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
+    RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
+    RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+
+    server_.bind("GetLocalRecons", [this]() {
+        // std::vector<Reconstruction> reconstructions;
+
+        // const size_t n = reconstruction_manager_->Size();
+        // for (size_t i = 0; i < n; i++) {
+        //     reconstructions.push_back(reconstruction_manager_->Get(i));
+        // }
+
+        // return reconstructions;
+        reconstruction_manager_->Get(0).ShowReconInfo();
+        return reconstruction_manager_->Get(0);
+    });
+
+    server_.bind("ResetWorkerInfo", [this]() {
+        info_.Reset();
+    });
+}
+
+void IncrementalMapperController::SetDatabaseCache(DatabaseCache* database_cache)
+{
+    // Ensure previous database_cache is correctly released.
+    database_cache_.release();
+    // Re-pointing to another database_cache.
+    database_cache_.reset(database_cache);
+}
+
+void IncrementalMapperController::SetReconManager(ReconstructionManager* recon_manager)
+{
+    reconstruction_manager_ = recon_manager;
+}
+
+void IncrementalMapperController::RunSfM()
+{
+    Run();
 }
 
 void IncrementalMapperController::Run() {
-  if (!LoadDatabase()) {
-    return;
+  // Clear previous reconstructions are needed, if we
+  // use the same reconstruction_manager to reconstruct two different
+  // tasks in distribution mode. Or it would cause duplicate reconstructions.
+  reconstruction_manager_->Clear();
+
+  if (database_cache_.get() == nullptr) {
+    database_cache_.reset(new DatabaseCache());
   }
+
+  if (database_cache_->NumImages() == 0) {
+    if (!LoadDatabase()) {
+      return;
+    }
+  } // else database_cache_ has been loaded.
+  
+  // Update local sfm running status.
+  info_.total_image_num = database_cache_->NumImages();
 
   IncrementalMapper::Options init_mapper_options = options_->Mapper();
   Reconstruct(init_mapper_options);
+
+  // Set running status
+  info_.idle = false;
+  info_.in_progress = true;
 
   const size_t kNumInitRelaxations = 2;
   for (size_t i = 0; i < kNumInitRelaxations; ++i) {
@@ -330,6 +395,9 @@ void IncrementalMapperController::Run() {
     init_mapper_options.init_min_tri_angle /= 2;
     Reconstruct(init_mapper_options);
   }
+
+  info_.completed = true;
+  reconstruction_manager_->Get(0).ShowReconInfo();
 
   std::cout << std::endl;
   GetTimer().PrintMinutes();
@@ -353,14 +421,14 @@ bool IncrementalMapperController::LoadDatabase() {
   Timer timer;
   timer.Start();
   const size_t min_num_matches = static_cast<size_t>(options_->min_num_matches);
-  database_cache_.Load(database, min_num_matches, options_->ignore_watermarks,
+  database_cache_->Load(database, min_num_matches, options_->ignore_watermarks,
                        image_names);
   std::cout << std::endl;
   timer.PrintMinutes();
 
   std::cout << std::endl;
 
-  if (database_cache_.NumImages() == 0) {
+  if (database_cache_->NumImages() == 0) {
     std::cout << "WARNING: No images with matches found in the database."
               << std::endl
               << std::endl;
@@ -378,7 +446,7 @@ void IncrementalMapperController::Reconstruct(
   // Main loop
   //////////////////////////////////////////////////////////////////////////////
 
-  IncrementalMapper mapper(&database_cache_);
+  IncrementalMapper mapper(database_cache_.get());
 
   // Is there a sub-model before we start the reconstruction? I.e. the user
   // has imported an existing reconstruction.
@@ -387,8 +455,7 @@ void IncrementalMapperController::Reconstruct(
                                                   "single reconstruction, but "
                                                   "multiple are given.";
 
-  for (int num_trials = 0; num_trials < options_->init_num_trials;
-       ++num_trials) {
+  for (int num_trials = 0; num_trials < options_->init_num_trials; ++num_trials) {
     BlockIfPaused();
     if (IsStopped()) {
       break;
@@ -495,6 +562,7 @@ void IncrementalMapperController::Reconstruct(
       }
 
       reg_next_success = false;
+      info_.registered_image_num = reconstruction.NumRegImages();
 
       const std::vector<image_t> next_images =
           mapper.FindNextImages(options_->Mapper());
@@ -599,7 +667,7 @@ void IncrementalMapperController::Reconstruct(
     // If the total number of images is small then do not enforce the minimum
     // model size so that we can reconstruct small image collections.
     const size_t min_model_size =
-        std::min(database_cache_.NumImages(),
+        std::min(database_cache_->NumImages(),
                  static_cast<size_t>(options_->min_model_size));
     if ((options_->multiple_models &&
          reconstruction.NumRegImages() < min_model_size) ||
@@ -616,7 +684,7 @@ void IncrementalMapperController::Reconstruct(
     const size_t max_num_models = static_cast<size_t>(options_->max_num_models);
     if (initial_reconstruction_given || !options_->multiple_models ||
         reconstruction_manager_->Size() >= max_num_models ||
-        mapper.NumTotalRegImages() >= database_cache_.NumImages() - 1) {
+        mapper.NumTotalRegImages() >= database_cache_->NumImages() - 1) {
       break;
     }
   }

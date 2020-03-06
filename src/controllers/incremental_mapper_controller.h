@@ -35,6 +35,9 @@
 #include "base/reconstruction_manager.h"
 #include "sfm/incremental_mapper.h"
 #include "util/threading.h"
+#include "map_reduce/worker.h"
+
+using namespace GraphSfM;
 
 namespace colmap {
 
@@ -71,7 +74,7 @@ struct IncrementalMapperOptions {
   int init_num_trials = 200;
 
   // Whether to extract colors for reconstructed points.
-  bool extract_colors = true;
+  bool extract_colors = false;
 
   // The number of threads to use during reconstruction.
   int num_threads = -1;
@@ -149,7 +152,7 @@ struct IncrementalMapperOptions {
 
 // Class that controls the incremental mapping procedure by iteratively
 // initializing reconstructions from the same scene graph.
-class IncrementalMapperController : public Thread {
+class IncrementalMapperController : public Thread, public SfMWorker {
  public:
   enum {
     INITIAL_IMAGE_PAIR_REG_CALLBACK,
@@ -161,6 +164,15 @@ class IncrementalMapperController : public Thread {
                               const std::string& image_path,
                               const std::string& database_path,
                               ReconstructionManager* reconstruction_manager);
+  
+  IncrementalMapperController(const IncrementalMapperOptions* options,
+                              ReconstructionManager* reconstruction_manager);
+
+  void SetDatabaseCache(DatabaseCache* database_cache);
+
+  void SetReconManager(ReconstructionManager* recon_manager);
+
+  void RunSfM();
 
  private:
   void Run();
@@ -171,7 +183,7 @@ class IncrementalMapperController : public Thread {
   const std::string image_path_;
   const std::string database_path_;
   ReconstructionManager* reconstruction_manager_;
-  DatabaseCache database_cache_;
+  std::unique_ptr<DatabaseCache> database_cache_;
 };
 
 // Globally filter points and images in mapper.

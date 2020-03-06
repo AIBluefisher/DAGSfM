@@ -25,6 +25,7 @@ struct ImageCluster
     std::vector<image_t> image_ids;
     Edges edges;
     bool is_condition_satisfy = false;
+    bool completed = false;
 
     // ImageCluster(const ImageCluster& image_cluster)
     // {

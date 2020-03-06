@@ -4,11 +4,13 @@
 #include <vector>
 #include <memory>
 
+#include "util/bitmap.h"
 #include "base/reconstruction.h"
 #include "base/similarity_transform.h"
 #include "estimators/sim3.h"
 #include "optim/bundle_adjustment.h"
 #include "graph/graph.h"
+#include "sfm/twoview_info.h"
 
 using namespace colmap;
 using namespace GraphSfM::graph;
@@ -20,11 +22,20 @@ using SimilarityGraph = std::unordered_map<size_t, std::unordered_map<size_t, Si
 class SfMAligner
 {
 public:
+    const static std::vector<BitmapColor<float>> ColorContainers;
     struct AlignOptions
     {
-        double min_inlier_observations = 0.3;
+        double threshold = 0.1;
 
-        double max_reprojection_error = 1.5;
+        double confidence = 0.99;
+
+        double max_reprojection_error = 1.8;
+
+        bool retriangulate = false;
+
+        bool final_ba = false;
+
+        bool assign_color_for_clusters = false;
     };
 
     struct Summary
@@ -77,39 +88,6 @@ private:
 
     bool AdjustGlobalBundle();
 };
-
-double MeanReprojectionResiduals(const std::vector<double>& residuals);
-
-std::vector<double> ComputeReprojectionResiduals(
-                                    const std::vector<Eigen::Vector3d>& src_points,
-                                    const std::vector<Eigen::Vector3d>& ref_points,
-                                    const Eigen::Matrix3x4d& alignment);
-
-double CheckReprojError(const std::vector<Eigen::Vector3d>& src_observations,
-                        const std::vector<Eigen::Vector3d>& dst_observations,
-                        const double& scale,
-                        const Eigen::Matrix3d& R,
-                        const Eigen::Vector3d& t);
-
-double CheckAngularResidual(const std::vector<Eigen::Matrix3d>& src_rotations,
-                           const std::vector<Eigen::Matrix3d>& dst_rotations,
-                           const Eigen::Matrix3d& R);
-
-void FindSimilarityTransform(const std::vector<Eigen::Vector3d>& observations1,
-                             const std::vector<Eigen::Vector3d>& observations2,
-                             Eigen::Matrix3d& R,
-                             Eigen::Vector3d& t,
-                             double& scale,
-                             double& msd);
-
-bool ComputeSimilarityByCameraMotions(
-                            std::vector<Eigen::Vector3d>& camera_centers1,
-                            std::vector<Eigen::Vector3d>& camera_centers2,
-                            std::vector<Eigen::Matrix3d>& camera_rotations1,
-                            std::vector<Eigen::Matrix3d>& camera_rotations2,
-                            Eigen::Matrix3d& relative_r,
-                            Eigen::Vector3d& relative_t,
-                            double& scale);
 
 } // namespace GraphSfM
 
