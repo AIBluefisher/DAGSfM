@@ -104,6 +104,13 @@ find_package(OpenGL REQUIRED)
 find_package(Glew REQUIRED)
 find_package(Git)
 
+find_package(RPCLib REQUIRED)
+if (RPCLIB_FOUND)
+    include_directories(RPCLIB_INCLUDE_DIR)
+else (RPCLIB_FOUND)
+    message(FATAL_ERROR "RPCLIB not found")
+endif (RPCLIB_FOUND)
+
 # Suitesparse
 find_package(SuiteSparse REQUIRED)
 if (SUITESPARSE_FOUND)
@@ -327,6 +334,7 @@ set(COLMAP_EXTERNAL_LIBRARIES
     ${GTEST_LIBRARIES}
     ${FREEIMAGE_LIBRARIES}
     ${CERES_LIBRARIES}
+    ${RPCLIB_LIBS}
     ${OPENGL_gl_LIBRARY}
     ${OPENGL_glu_LIBRARY}
     ${Qt5Core_LIBRARIES}

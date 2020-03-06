@@ -45,8 +45,6 @@
 #include "feature/extraction.h"
 #include "feature/matching.h"
 #include "feature/utils.h"
-#include "mvs/meshing.h"
-#include "mvs/patch_match.h"
 #include "retrieval/visual_index.h"
 #include "ui/main_window.h"
 #include "util/opengl_utils.h"
@@ -114,8 +112,6 @@ int RunAutomaticReconstructor(int argc, char** argv) {
   options.AddDefaultOption("single_camera",
                            &reconstruction_options.single_camera);
   options.AddDefaultOption("sparse", &reconstruction_options.sparse);
-  options.AddDefaultOption("dense", &reconstruction_options.dense);
-  options.AddDefaultOption("mesher", &mesher, "{poisson, delaunay}");
   options.AddDefaultOption("num_threads", &reconstruction_options.num_threads);
   options.AddDefaultOption("use_gpu", &reconstruction_options.use_gpu);
   options.AddDefaultOption("gpu_index", &reconstruction_options.gpu_index);
@@ -150,17 +146,6 @@ int RunAutomaticReconstructor(int argc, char** argv) {
         AutomaticReconstructionController::Quality::EXTREME;
   } else {
     LOG(FATAL) << "Invalid quality provided";
-  }
-
-  StringToLower(&mesher);
-  if (mesher == "poisson") {
-    reconstruction_options.mesher =
-        AutomaticReconstructionController::Mesher::POISSON;
-  } else if (mesher == "delaunay") {
-    reconstruction_options.mesher =
-        AutomaticReconstructionController::Mesher::DELAUNAY;
-  } else {
-    LOG(FATAL) << "Invalid mesher provided";
   }
 
   ReconstructionManager reconstruction_manager;
@@ -254,69 +239,6 @@ int RunDatabaseMerger(int argc, char** argv) {
   return EXIT_SUCCESS;
 }
 
-int RunStereoFuser(int argc, char** argv) {
-  std::string workspace_path;
-  std::string input_type = "geometric";
-  std::string workspace_format = "COLMAP";
-  std::string pmvs_option_name = "option-all";
-  std::string output_path;
-
-  OptionManager options;
-  options.AddRequiredOption("workspace_path", &workspace_path);
-  options.AddDefaultOption("workspace_format", &workspace_format,
-                           "{COLMAP, PMVS}");
-  options.AddDefaultOption("pmvs_option_name", &pmvs_option_name);
-  options.AddDefaultOption("input_type", &input_type,
-                           "{photometric, geometric}");
-  options.AddRequiredOption("output_path", &output_path);
-  options.AddStereoFusionOptions();
-  options.Parse(argc, argv);
-
-  StringToLower(&workspace_format);
-  if (workspace_format != "colmap" && workspace_format != "pmvs") {
-    std::cout << "ERROR: Invalid `workspace_format` - supported values are "
-                 "'COLMAP' or 'PMVS'."
-              << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  StringToLower(&input_type);
-  if (input_type != "photometric" && input_type != "geometric") {
-    std::cout << "ERROR: Invalid input type - supported values are "
-                 "'photometric' and 'geometric'."
-              << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  mvs::StereoFusion fuser(*options.stereo_fusion, workspace_path,
-                          workspace_format, pmvs_option_name, input_type);
-
-  fuser.Start();
-  fuser.Wait();
-
-  std::cout << "Writing output: " << output_path << std::endl;
-  WriteBinaryPlyPoints(output_path, fuser.GetFusedPoints());
-  mvs::WritePointsVisibility(output_path + ".vis",
-                             fuser.GetFusedPointsVisibility());
-
-  return EXIT_SUCCESS;
-}
-
-int RunPoissonMesher(int argc, char** argv) {
-  std::string input_path;
-  std::string output_path;
-
-  OptionManager options;
-  options.AddRequiredOption("input_path", &input_path);
-  options.AddRequiredOption("output_path", &output_path);
-  options.AddPoissonMeshingOptions();
-  options.Parse(argc, argv);
-
-  CHECK(mvs::PoissonMeshing(*options.poisson_meshing, input_path, output_path));
-
-  return EXIT_SUCCESS;
-}
-
 int RunProjectGenerator(int argc, char** argv) {
   std::string output_path;
   std::string quality = "high";
@@ -345,84 +267,6 @@ int RunProjectGenerator(int argc, char** argv) {
   output_options.Write(output_path);
 
   return EXIT_SUCCESS;
-}
-
-int RunDelaunayMesher(int argc, char** argv) {
-#ifndef CGAL_ENABLED
-  std::cerr << "ERROR: Delaunay meshing requires CGAL, which is not "
-               "available on your system."
-            << std::endl;
-  return EXIT_FAILURE;
-#else   // CGAL_ENABLED
-  std::string input_path;
-  std::string input_type = "dense";
-  std::string output_path;
-
-  OptionManager options;
-  options.AddRequiredOption(
-      "input_path", &input_path,
-      "Path to either the dense workspace folder or the sparse reconstruction");
-  options.AddDefaultOption("input_type", &input_type, "{dense, sparse}");
-  options.AddRequiredOption("output_path", &output_path);
-  options.AddDelaunayMeshingOptions();
-  options.Parse(argc, argv);
-
-  StringToLower(&input_type);
-  if (input_type == "sparse") {
-    mvs::SparseDelaunayMeshing(*options.delaunay_meshing, input_path,
-                               output_path);
-  } else if (input_type == "dense") {
-    mvs::DenseDelaunayMeshing(*options.delaunay_meshing, input_path,
-                              output_path);
-  } else {
-    std::cout << "ERROR: Invalid input type - "
-                 "supported values are 'sparse' and 'dense'."
-              << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  return EXIT_SUCCESS;
-#endif  // CGAL_ENABLED
-}
-
-int RunPatchMatchStereo(int argc, char** argv) {
-#ifndef CUDA_ENABLED
-  std::cerr << "ERROR: Dense stereo reconstruction requires CUDA, which is not "
-               "available on your system."
-            << std::endl;
-  return EXIT_FAILURE;
-#else   // CUDA_ENABLED
-  std::string workspace_path;
-  std::string workspace_format = "COLMAP";
-  std::string pmvs_option_name = "option-all";
-
-  OptionManager options;
-  options.AddRequiredOption(
-      "workspace_path", &workspace_path,
-      "Path to the folder containing the undistorted images");
-  options.AddDefaultOption("workspace_format", &workspace_format,
-                           "{COLMAP, PMVS}");
-  options.AddDefaultOption("pmvs_option_name", &pmvs_option_name);
-  options.AddPatchMatchStereoOptions();
-  options.Parse(argc, argv);
-
-  StringToLower(&workspace_format);
-  if (workspace_format != "colmap" && workspace_format != "pmvs") {
-    std::cout << "ERROR: Invalid `workspace_format` - supported values are "
-                 "'COLMAP' or 'PMVS'."
-              << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  mvs::PatchMatchController controller(*options.patch_match_stereo,
-                                       workspace_path, workspace_format,
-                                       pmvs_option_name);
-
-  controller.Start();
-  controller.Wait();
-
-  return EXIT_SUCCESS;
-#endif  // CUDA_ENABLED
 }
 
 int RunExhaustiveMatcher(int argc, char** argv) {
@@ -984,6 +828,7 @@ int RunDistributedMapper(int argc, char** argv)
     DistributedMapperController::Options distributed_options;
     ImageClustering::Options clustering_options;
     std::string output_path;
+    std::string config_file_name = "";
     FLAGS_log_dir = argv[1];
 
     OptionManager options;
@@ -992,6 +837,11 @@ int RunDistributedMapper(int argc, char** argv)
     options.AddRequiredOption("image_path", &distributed_options.image_path);
     options.AddRequiredOption("output_path", &output_path);
     options.AddDefaultOption("num_workers", &distributed_options.num_workers);
+    options.AddDefaultOption("distributed", &distributed_options.distributed);
+    options.AddDefaultOption("config_file_name", &config_file_name);
+    options.AddDefaultOption("repartition", &distributed_options.is_repartition_for_mvs);
+    options.AddDefaultOption("assign_cluster_id", &distributed_options.assign_cluster_id);
+    options.AddDefaultOption("write_binary", &distributed_options.write_binary);
     options.AddDefaultOption("image_overlap", &clustering_options.image_overlap);
     options.AddDefaultOption("num_images_ub",
                              &clustering_options.num_images_ub);
@@ -1003,10 +853,6 @@ int RunDistributedMapper(int argc, char** argv)
     options.AddMapperOptions();
     options.Parse(argc, argv);
 
-    // if (!ExistsDir(output_path)) {
-    //     std::cerr << "ERROR: `output_path` is not a directory." << std::endl;
-    //     return EXIT_FAILURE;
-    // }
     CreateDirIfNotExists(output_path);
 
     distributed_options.output_path = output_path;
@@ -1016,12 +862,70 @@ int RunDistributedMapper(int argc, char** argv)
     DistributedMapperController distributed_mapper(
         distributed_options, clustering_options, *options.mapper,
         &reconstruction_manager);
+    
+    if (distributed_options.distributed) {
+        MapReduceConfig map_reduce_config;
+        if (!map_reduce_config.ReadConfig(config_file_name)) {
+            return 0;
+        }
+
+        distributed_mapper.SetMapReduceConfig(map_reduce_config);
+    }
+
     distributed_mapper.Start();
     distributed_mapper.Wait();
 
-    reconstruction_manager.Write(output_path, &options);
+    for (size_t i = 0; i < reconstruction_manager.Size(); ++i) {
+        const std::string reconstruction_path = JoinPaths(output_path, std::to_string(i));
+        CreateDirIfNotExists(reconstruction_path);
+
+        if (distributed_options.write_binary) {
+            reconstruction_manager.Get(i).WriteBinary(reconstruction_path);
+        } else {
+            reconstruction_manager.Get(i).WriteText(reconstruction_path);
+        }
+    }
 
     return EXIT_SUCCESS;
+}
+
+int RunLocalSfMWorker(int argc, char** argv) {
+  std::string input_path;
+  std::string output_path;
+  std::string image_list_path;
+
+  OptionManager options;
+  options.AddRequiredOption("output_path", &output_path);
+  options.AddMapperOptions();
+  options.Parse(argc, argv);
+
+  CreateDirIfNotExists(output_path);
+
+  if (!image_list_path.empty()) {
+    const auto image_names = ReadTextFileLines(image_list_path);
+    options.mapper->image_names =
+        std::unordered_set<std::string>(image_names.begin(), image_names.end());
+  }
+
+  ReconstructionManager reconstruction_manager;
+
+  IncrementalMapperController mapper(options.mapper.get(),
+                                     &reconstruction_manager);
+  rpc::server& srv = mapper.Server();
+  srv.bind("RunSfM", [&](DatabaseCache& database_cache){
+      LOG(INFO) << "RunSfM";
+      mapper.SetDatabaseCache(&database_cache);
+    //   mapper.RunSfM();
+      LOG(INFO) << "Start";
+      mapper.Start();
+      mapper.Wait();
+  });
+  
+  //   srv.run();
+  srv.async_run(2);
+  std::cin.ignore();
+
+  return EXIT_SUCCESS;
 }
 
 int RunMatchesImporter(int argc, char** argv) {
@@ -2015,7 +1919,7 @@ typedef std::function<int(int, char**)> command_func_t;
 int ShowHelp(
     const std::vector<std::pair<std::string, command_func_t>>& commands) {
   std::cout << StringPrintf(
-                   "%s -- Structure-from-Motion and Multi-View Stereo\n"
+                   "%s -- Structure-from-Motion\n"
                    "              (%s)",
                    GetVersionInfo().c_str(), GetBuildInfo().c_str())
             << std::endl
@@ -2065,12 +1969,12 @@ int main(int argc, char** argv) {
   commands.emplace_back("color_extractor", &RunColorExtractor);
   commands.emplace_back("database_creator", &RunDatabaseCreator);
   commands.emplace_back("database_merger", &RunDatabaseMerger);
-  commands.emplace_back("delaunay_mesher", &RunDelaunayMesher);
   commands.emplace_back("exhaustive_matcher", &RunExhaustiveMatcher);
   commands.emplace_back("feature_extractor", &RunFeatureExtractor);
   commands.emplace_back("feature_importer", &RunFeatureImporter);
   commands.emplace_back("hierarchical_mapper", &RunHierarchicalMapper);
   commands.emplace_back("distributed_mapper", &RunDistributedMapper);
+  commands.emplace_back("local_sfm_worker", &RunLocalSfMWorker);
   commands.emplace_back("image_deleter", &RunImageDeleter);
   commands.emplace_back("image_filterer", &RunImageFilterer);
   commands.emplace_back("image_rectifier", &RunImageRectifier);
@@ -2084,15 +1988,12 @@ int main(int argc, char** argv) {
   commands.emplace_back("model_merger", &RunModelMerger);
   commands.emplace_back("model_orientation_aligner",
                         &RunModelOrientationAligner);
-  commands.emplace_back("patch_match_stereo", &RunPatchMatchStereo);
   commands.emplace_back("point_filtering", &RunPointFiltering);
   commands.emplace_back("point_triangulator", &RunPointTriangulator);
-  commands.emplace_back("poisson_mesher", &RunPoissonMesher);
   commands.emplace_back("project_generator", &RunProjectGenerator);
   commands.emplace_back("rig_bundle_adjuster", &RunRigBundleAdjuster);
   commands.emplace_back("sequential_matcher", &RunSequentialMatcher);
   commands.emplace_back("spatial_matcher", &RunSpatialMatcher);
-  commands.emplace_back("stereo_fusion", &RunStereoFuser);
   commands.emplace_back("transitive_matcher", &RunTransitiveMatcher);
   commands.emplace_back("vocab_tree_builder", &RunVocabTreeBuilder);
   commands.emplace_back("vocab_tree_matcher", &RunVocabTreeMatcher);
