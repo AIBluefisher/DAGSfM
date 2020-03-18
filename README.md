@@ -79,7 +79,6 @@ sudo make install
 
 #### [rpclib](https://github.com/qchateau/rpclib)
 
-Build our GraphSfM
 ```sh
 git clone https://github.com/qchateau/rpclib.git
 cd rpclib
@@ -87,6 +86,14 @@ mkdir build && cd build
 cmake ..
 make -j8
 sudo make install
+```
+#### Build our GraphSfM
+
+```sh
+git clone https://github.com/AIBluefisher/GraphSfM.git
+cd GraphSfM
+mkdir build && cd build
+cmake .. && make -j8
 ```
 
 ## 3. Usage
