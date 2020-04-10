@@ -3,19 +3,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "controllers/sfm_aligner.h"
-#include "estimators/similarity_transform.h"
-#include "estimators/ransac_similarity.h"
-#include "estimators/sim3.h"
-#include "optim/bundle_adjustment.h"
-#include "util/timer.h"
-#include "math/util.h"
-#include "sfm/incremental_triangulator.h"
-#include "solver/l1_solver.h"
-#include "base/similarity_transform.h"
-#include "util/reconstruction_io.h"
-#include "util/misc.h"
-
 #include <glog/logging.h>
 #include <Eigen/Geometry>
 #include <ceres/rotation.h>
@@ -26,7 +13,19 @@
 #include <ceres/solver.h>
 #include <ceres/cost_function.h>
 
-
+#include "controllers/sfm_aligner.h"
+#include "estimators/similarity_transform.h"
+#include "estimators/ransac_similarity.h"
+#include "estimators/sim3.h"
+#include "optim/bundle_adjustment.h"
+#include "util/timer.h"
+#include "math/util.h"
+#include "sfm/incremental_triangulator.h"
+#include "solver/l1_solver.h"
+#include "base/similarity_transform.h"
+#include "base/track_selection.h"
+#include "util/reconstruction_io.h"
+#include "util/misc.h"
 
 namespace GraphSfM {
 namespace {
@@ -210,9 +209,9 @@ bool ComputeSimilarityByCameraMotions(
 } // namespace
 
 SfMAligner::SfMAligner(const std::vector<Reconstruction*>& reconstructions,
-                       const BundleAdjustmentOptions& ba_options)
+                       const AlignOptions& options)
      : reconstructions_(reconstructions),
-       ba_options_(ba_options)
+       options_(options)
 {
     // some logic or parameters check
     CHECK_GT(reconstructions.size(), 0);
@@ -236,12 +235,17 @@ const std::vector<BitmapColor<float>> SfMAligner::ColorContainers = {
 
 bool SfMAligner::Align()
 {
+    Timer timer;
+
     // 1. Constructing a graph from reconstructions,
     // each node is a reconstruction, edges represent the connections between 
     // reconstructions (by the means of common images or common 3D points), the weight
     // of edge represents the mean reprojection error.
     LOG(INFO) << "Constructing Reconstructions Graph...";
+    timer.Start();
     ConstructReconsGraph();
+    timer.Pause();
+    summary_.construct_recon_graph_time = timer.ElapsedSeconds();
     recons_graph_.ShowInfo();
     CHECK_EQ(recons_graph_.GetNodesNum(), reconstructions_.size());
 
@@ -251,12 +255,14 @@ bool SfMAligner::Align()
     if (recons_graph_.GetEdgesNum() < recons_graph_.GetNodesNum() - 1) {
         LOG(ERROR) << "Can't align all reconstructions together due to "
                    << "too large alignment error or disconnected components";
+
         return false;
     }
 
     // 2. Constructing a minimum spanning tree, thus we can select the
     // most accurate n - 1 edges for accurate alignment.
     LOG(INFO) << "Finding Minimum Spanning Tree...";
+    timer.Start();
     std::vector<Edge> mst_edges = recons_graph_.Kruskal();
 
     Graph<Node, Edge> mst;
@@ -273,42 +279,35 @@ bool SfMAligner::Align()
         return false;
     }
     mst.ShowInfo();
+    timer.Pause();
+    summary_.construct_mst_time = timer.ElapsedSeconds();
 
     // 3. Finding an anchor node, an anchor node is a reference reconstruction 
     // that all other reconstructions should be aligned to.
     LOG(INFO) << "Finding Anchor Node...";
+    timer.Start();
     FindAnchorNode(&mst);
+    timer.Pause();
+    summary_.find_anchor_node_time = timer.ElapsedSeconds();
 
     // 4. Compute the final transformation to anchor node for each cluster
     LOG(INFO) << "Computing Final Similarity Transformations...";
+    timer.Start();
     for (uint i = 0; i < reconstructions_.size(); i++) {
         if (static_cast<int>(i) != anchor_node_.id) {
             this->ComputePath(i, anchor_node_.id);
         }
     }
     sim3_to_anchor_[anchor_node_.id] = Sim3();
+    timer.Pause();
+    summary_.compute_final_transformation_time = timer.ElapsedSeconds();
 
     // 5. Merging all other reconstructions to anchor node
     LOG(INFO) << "Merging Reconstructions...";
+    timer.Start();
     this->MergeReconstructions();
-
-    // 6. Re-triangulation
-    if (options_.retriangulate) {
-        LOG(INFO) << "Re-triangulating...";
-
-        std::unique_ptr<IncrementalTriangulator> triangulator;
-        triangulator.reset(new IncrementalTriangulator(
-                reconstructions_[anchor_node_.id]->GetCorrespondenceGraph(), 
-                reconstructions_[anchor_node_.id]));
-        IncrementalTriangulator::Options triangulator_options;
-        triangulator->Retriangulate(triangulator_options);
-    }
-
-    // 7. Final Bundle Adjustment
-    if (options_.final_ba) {
-        LOG(INFO) << "Final Global Bundle Adjustment";
-        this->AdjustGlobalBundle();
-    }
+    timer.Pause();
+    summary_.merging_time = timer.ElapsedSeconds();
 
     return true;
 }
@@ -538,43 +537,5 @@ void SfMAligner::MergeReconstructions()
                                                  alignment);
     }
 }
-
-bool SfMAligner::AdjustGlobalBundle()
-{
-    Reconstruction* final_recon = reconstructions_[anchor_node_.id];
-    CHECK_NOTNULL(final_recon);
-
-    const std::vector<image_t>& reg_image_ids = final_recon->RegImageIds();
-
-    CHECK_GE(reg_image_ids.size(), 2) << "At least two images must be "
-                                         "registered for global bundle-adjustment";
-    
-    // Avoid degeneracies in bundle adjustment.
-    final_recon->FilterObservationsWithNegativeDepth();
-
-    // Configure bundle adjustment
-    BundleAdjustmentConfig ba_config;
-    for (const image_t image_id : reg_image_ids) {
-        ba_config.AddImage(image_id);
-    }
-
-    // Fix 7-DOFs of the bundle adjustment problem.
-    ba_config.SetConstantPose(reg_image_ids[0]);
-    ba_config.SetConstantTvec(reg_image_ids[1], {0});
-
-    // Run bundle adjustment.
-    BundleAdjuster bundle_adjuster(ba_options_, ba_config);
-    if (!bundle_adjuster.Solve(final_recon)) {
-        return false;
-    }
-
-    // Normalize scene for numerical stability and
-    // to avoid large scale changes in viewer.
-    final_recon->Normalize();
-
-    return true;
-}
-
-
 
 } // namespace GraphSfM

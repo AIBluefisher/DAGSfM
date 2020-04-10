@@ -1,5 +1,7 @@
 #include "clustering/image_clustering.h"
 #include "clustering/ncut_cluster.h"
+#include "clustering/kmeans_cluster.h"
+#include "clustering/spectral_cluster.h"
 #include "util/misc.h"
 #include "util/random.h"
 #include "util/map_util.h"
@@ -259,7 +261,11 @@ std::unique_ptr<Cluster> ImageClustering::CreateCluster() const
 {
     if (options_.cluster_type == "NCUT") {
         return std::unique_ptr<Cluster>(new NCutCluster());
-    } else {
+    } else if (options_.cluster_type == "KMEANS") {
+        return std::unique_ptr<Cluster>(new KMeansCluster());
+    } else if (options_.cluster_type == "SPECTRAL") {
+        return std::unique_ptr<Cluster>(new SpectralCluster());
+    }else {
         return std::unique_ptr<Cluster>(new NCutCluster());
     }
 }

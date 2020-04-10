@@ -38,6 +38,17 @@ public:
         // The path to the database file which is used as input
         std::string database_path;
 
+        bool transfer_images_to_server = false;
+
+        // Indicates if reconstruct the largest connected components.
+        bool reconstruct_largest_cc = true;
+
+        // Minimum track length for track_builder.
+        int min_track_length = 2;
+
+        // Maximum track length for track_builder.
+        int max_track_length = 20;
+
         double max_relative_rotation_difference_degrees = 5.0;
 
         // minimum number of feature matches in an epipolar edge
@@ -63,6 +74,52 @@ public:
 
         // output format.
         bool write_binary = true;
+
+        // If perform re-triangulation after align all local reconstructions.
+        bool retriangulate = false;
+
+        // If perform final bundle adjustment after align all local reconstructions.
+        bool final_ba = true;
+        
+        // Bundle adjustment performs joint nonlinear optimization of point positions
+        // and camera poses by minimizing reprojection error. For many scenes, the 3d
+        // points can be highly redundant such that adding more points only marginally
+        // improves the reconstruction quality (if at all) despite a large increase in
+        // runtime. As such, we can reduce the number of 3d points used in bundle
+        // adjustment and still achieve similar or even better quality reconstructions
+        // by carefully choosing the points such that they properly constrain the
+        // optimization.
+        //
+        // If subsampling the tracks is set to true, then the 3d points are chosen
+        // such that they fit the following criteria:
+        //
+        //    a) High confidence (i.e. low reprojection error).
+        //    b) Long tracks are preferred.
+        //    c) The tracks used for optimization provide a good spatial coverage in
+        //       each image.
+        //    d) Each view observes at least K optimized tracks.
+        //
+        // Tracks are selected to optimize for these criteria using the thresholds
+        // below.
+        bool select_tracks_for_bundle_adjustment = true;
+
+        // Long tracks are preferred during the track subsampling, but csweeney has
+        // observed that long tracks often are more likely to contain outlier. Thus,
+        // we cap the track length for track selection at 10 then sort tracks first by
+        // the truncated track length, then secondarily by their mean reprojection
+        // error. This allows us to choose the high quality tracks among all the long
+        // tracks.
+        int long_track_length_threshold = 10;
+
+        // To satisfy c) above, we divide each image into an image grid with grid cell
+        // widths specified by this threshold. The top ranked track in each grid cell
+        // is chosen to be optimized so that each image has a good spatial coverage.
+        int image_grid_cell_size_pixels = 100;
+
+        // The minimum number of optimized tracks required for each view when using
+        // track subsampling. If the view does not observe this many tracks, then all
+        // tracks in the view are optimized.
+        int min_num_optimized_tracks_per_view = 200;
 
         bool Check() const;
     };
@@ -91,6 +148,9 @@ private:
                   std::unordered_map<image_t, std::string>& image_id_to_name,
                   std::vector<image_t>& image_ids);
 
+    // Update image ids to only contain the largest connected components.
+    void ExtractLargestCC();
+
     std::vector<ImageCluster> ClusteringScenes(
         const std::vector<std::pair<image_t, image_t>>& image_pairs,
         const std::vector<int>& num_inliers,
@@ -112,6 +172,8 @@ private:
         std::unordered_map<const ImageCluster*, ReconstructionManager>& reconstruction_managers,
         const int num_eff_threads);
 
+    bool AdjustGlobalBundle();
+    
     void RepartitionScenesForMVS();
 
     void ExportUntransformedLocalRecons(

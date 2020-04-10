@@ -40,15 +40,19 @@ public:
 
     struct Summary
     {
-        double recon_graph_construction_time;
+        double construct_recon_graph_time;
+
+        double construct_mst_time;
+
+        double find_anchor_node_time;
+
+        double compute_final_transformation_time;
 
         double merging_time;
-
-        double final_ba_time;
     };
 
     SfMAligner(const std::vector<Reconstruction*>& reconstructions,
-               const BundleAdjustmentOptions& ba_options);
+               const AlignOptions& options);
 
     bool Align();
 
@@ -59,7 +63,7 @@ public:
 private:
     AlignOptions options_;
 
-    BundleAdjustmentOptions ba_options_;
+    SfMAligner::Summary summary_;
 
     std::vector<Reconstruction*> reconstructions_;
 
@@ -85,8 +89,6 @@ private:
     void ComputePath(int src, int dst);
 
     void MergeReconstructions();
-
-    bool AdjustGlobalBundle();
 };
 
 } // namespace GraphSfM

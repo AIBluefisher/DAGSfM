@@ -2,11 +2,13 @@
 #define _SRC_MAPREDUCE_WORDER_H_
 
 #include <memory>
+#include <fstream>
 
 #include "map_reduce/communicator.h"
 #include "map_reduce/running_info.h"
 #include "rpc/server.h"
 #include "rpc/client.h"
+#include "util/misc.h"
 
 namespace GraphSfM {
 
@@ -19,6 +21,18 @@ public:
 
         server_.bind("StopServer", []() {
             rpc::this_server().stop();
+        });
+
+        server_.bind("SaveImage", 
+        [](const std::string& image_path,
+           const std::string& image_name,
+           const std::vector<char>& buffer, int length) {
+            CreateDirIfNotExists(image_path);
+            std::ofstream of(
+                colmap::JoinPaths(image_path, image_name).c_str(), 
+                std::ifstream::out | std::ifstream::binary);
+            of.write(buffer.data(), length);
+            of.close();
         });
     }
 

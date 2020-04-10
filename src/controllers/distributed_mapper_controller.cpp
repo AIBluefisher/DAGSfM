@@ -1,12 +1,4 @@
 #include "controllers/distributed_mapper_controller.h"
-#include "controllers/sfm_aligner.h"
-#include "base/database.h"
-#include "util/logging.h"
-#include "util/misc.h"
-#include "util/timer.h"
-#include "math/util.h"
-#include "util/reconstruction_io.h"
-#include "sfm/incremental_triangulator.h"
 
 #include <iostream>
 #include <utility>
@@ -22,6 +14,16 @@
 #include <ceres/rotation.h>
 #include <boost/filesystem.hpp>
 
+#include "controllers/sfm_aligner.h"
+#include "base/database.h"
+#include "base/track_selection.h"
+#include "util/logging.h"
+#include "util/misc.h"
+#include "util/timer.h"
+#include "math/util.h"
+#include "util/reconstruction_io.h"
+#include "sfm/incremental_triangulator.h"
+
 using namespace colmap;
 
 #define __DEBUG__
@@ -36,6 +38,21 @@ void ExtractColors(const std::string& image_path, const image_t image_id,
                                   reconstruction->Image(image_id).Name().c_str(),
                                   image_path.c_str())
                   << std::endl;
+    }
+}
+
+
+void ExtractColors(const std::string& image_path,
+                   Reconstruction* reconstruction)
+{
+    const auto image_ids = reconstruction->RegImageIds();
+    for (const auto image_id : image_ids) {
+        if (!reconstruction->ExtractColorsForImage(image_id, image_path)) {
+            std::cout << StringPrintf("WARNING: Could not read image %s at path %s.",
+                                      reconstruction->Image(image_id).Name().c_str(),
+                                      image_path.c_str())
+                      << std::endl;
+        }
     }
 }
 }
@@ -68,16 +85,15 @@ void DistributedMapperController::Run()
     std::vector<Image> images;
     LoadData(image_pairs_, num_inliers_, image_id_to_name_, image_ids_);
 
-    // //////////////////////////////////////////////////////////////////
-    // // // 2. Global Rotation Averaging ///////////////////////////////
-    // //////////////////////////////////////////////////////////////////
-    // PrintHeading1("Global Rotation Averaging...");
-
-    // for (auto image : images) {
-    //     rotations_[image.ImageId()] = Eigen::Vector3d::Zero();
-    // }
-    // GlobalRotationAveraging(view_pairs_);
-
+    //////////////////////////////////////////////////////////////////
+    // // 2. Extracting the largest connected component //////////////
+    //////////////////////////////////////////////////////////////////
+    if (options_.reconstruct_largest_cc) {
+        PrintHeading1("Extracting Largest Connected Component...");
+        LOG(INFO) << "Total image number: " << image_ids_.size();
+        ExtractLargestCC();
+        LOG(INFO) << "image number in largest cc: " << image_ids_.size();
+    }
 
     //////////////////////////////////////////////////////////////////
     // 3. Partitioning the images into the given number of clusters //
@@ -94,8 +110,34 @@ void DistributedMapperController::Run()
         RunSequential();
     }
 
+    //////////////////////////////////////////////////////////////////
+    // // 5. Re-triangulate scene structures /////////////////////////
+    //////////////////////////////////////////////////////////////////
+    if (options_.retriangulate) {
+        LOG(INFO) << "Re-triangulating...";
+        Reconstruction& global_recon = reconstruction_manager_->Get(0);
+        std::unique_ptr<IncrementalTriangulator> triangulator;
+        triangulator.reset(new IncrementalTriangulator(
+                global_recon.GetCorrespondenceGraph(), 
+                &global_recon));
+        IncrementalTriangulator::Options triangulator_options;
+        triangulator->Retriangulate(triangulator_options);
+    }
+
+    //////////////////////////////////////////////////////////////////
+    // // 6. Final global bundle adjustment //////////////////////////
+    //////////////////////////////////////////////////////////////////
+    if (options_.final_ba && (image_clustering_->GetInterClusters().size() > 1)) {
+        LOG(INFO) << "Final Global Bundle Adjustment";
+        Timer timer;
+        timer.Start();
+        this->AdjustGlobalBundle();
+        timer.Pause();
+        LOG(INFO) << "Final bundle adjustment took: " << timer.ElapsedSeconds() << " seconds.";
+    }
+
     //////////////////////////////////////////////////
-    //// 5. Extract colors ///////////////////////////
+    //// 7. Extract colors ///////////////////////////
     //////////////////////////////////////////////////
     Reconstruction& reconstruction = 
         reconstruction_manager_->Get(reconstruction_manager_->Size() - 1);
@@ -106,7 +148,7 @@ void DistributedMapperController::Run()
     }
 
     //////////////////////////////////////////////////
-    //// 6. Optional: Partition Scenes for MVS ///////
+    //// 8. Optional: Partition Scenes for MVS ///////
     //////////////////////////////////////////////////
     if (options_.is_repartition_for_mvs) {
         LOG(INFO) << "Repartioning scenes for MVS";
@@ -243,6 +285,24 @@ bool DistributedMapperController::RunDistributed()
 
             // Remote async calling for local Structure-from-Motion.
             size_t job_id = job_queue.front(); job_queue.pop();
+
+            // Transfer images to worker server.
+            std::unordered_set<std::string> image_names;
+            image_names.reserve(inter_clusters_[job_id].image_ids.size());
+            for (const auto image_id : inter_clusters_[job_id].image_ids) {
+                image_names.insert(image_id_to_name_.at(image_id));
+            }
+            
+            if (options_.transfer_images_to_server) {
+                LOG(INFO) << "Transferring images to cluster #" << idle_server_id << "#.";
+                CallSaveImages(
+                    idle_server_id, 
+                    options_.image_path,
+                    colmap::JoinPaths(map_reduce_config_.image_paths[idle_server_id],
+                                      "cluster" + std::to_string(job_id)), 
+                    image_names);
+            }
+
             c.async_call("RunSfM", cluster_database_caches[&inter_clusters_[job_id]]);
             timers_[idle_server_id].Start();
             working_jobs.insert({job_id, idle_server_id});
@@ -376,6 +436,51 @@ void DistributedMapperController::LoadData(std::vector<std::pair<image_t, image_
     database_.ReadTwoViewGeometryNumInliers(&image_pairs, &num_inliers);
 }
 
+void DistributedMapperController::ExtractLargestCC()
+{
+    graph::UnionFind uf(image_ids_.size());
+    std::vector<size_t> tmp_nodes(image_ids_.begin(), image_ids_.end());
+    uf.InitWithNodes(tmp_nodes);
+
+    for (auto image_pair : image_pairs_) {
+        uf.Union(image_pair.first, image_pair.second);
+    }
+
+    std::unordered_map<size_t, std::vector<image_t>> components;
+    for (auto image_id : image_ids_) {
+        const size_t parent_id = uf.FindRoot(image_id);
+        components[parent_id].push_back(image_id);
+    }
+
+    size_t num_largest_component = 0;
+    size_t largest_component_id;
+    for (const auto& it : components) {
+        if (num_largest_component < it.second.size()) {
+            num_largest_component = it.second.size();
+            largest_component_id = it.first;
+        }
+    }
+
+    image_ids_.clear();
+    image_ids_.assign(components[largest_component_id].begin(),
+                      components[largest_component_id].end());
+    image_ids_.shrink_to_fit();
+    std::sort(image_ids_.begin(), image_ids_.end());
+
+    LOG(INFO) << "There are " << components.size() << " connected components.";
+    int num_small_connected_components = 0;
+    for (auto component : components) {
+        if (component.second.size() < 100) { 
+            num_small_connected_components++; 
+        } else {
+            LOG(INFO) << "Component #" << component.first << "# has " 
+                  << component.second.size() << " images.";
+        }
+    }
+    LOG(INFO) << "There are " << num_small_connected_components
+              << "small connected components are discarded.";
+}
+
 std::vector<ImageCluster> DistributedMapperController::ClusteringScenes(
     const std::vector<std::pair<image_t, image_t>>& image_pairs,
     const std::vector<int>& num_inliers,
@@ -474,16 +579,23 @@ void DistributedMapperController::MergeClusters(std::vector<Reconstruction*>& re
                                                 Node& anchor_node)
 {
     if (reconstructions.size() > 1) {
-        BundleAdjustmentOptions ba_options = this->GlobalBundleAdjustment();
-        ba_options.solver_options.num_threads = num_eff_threads;
-
-        SfMAligner sfm_aligner(reconstructions, ba_options);
+        SfMAligner::AlignOptions align_options;
+        SfMAligner sfm_aligner(reconstructions, align_options);
 
         if (sfm_aligner.Align()) {
             anchor_node = sfm_aligner.GetAnchorNode();
         }
 
-        CHECK_NE(anchor_node.id, -1);
+        if (anchor_node.id == -1) {
+            LOG(INFO) << "Extracting colors for local maps.";
+            for (auto& reconstruction : reconstructions) {
+                ExtractColors(options_.image_path, reconstruction);
+            }
+            LOG(ERROR) << "Align failed, local reconstructions are exported to "
+                       << options_.output_path;
+            return;
+        }
+
         CHECK_NOTNULL(reconstructions[anchor_node.id]);
 
         #ifdef __DEBUG__
@@ -610,6 +722,69 @@ void DistributedMapperController::RepartitionScenesForMVS()
         WriteImagesBinary(images, JoinPaths(reconstruction_path, "images.bin"));
         WritePoints3DBinary(points3D, JoinPaths(reconstruction_path, "points3D.bin"));
     }
+}
+
+bool DistributedMapperController::AdjustGlobalBundle()
+{
+    BundleAdjustmentOptions ba_options = this->GlobalBundleAdjustment();
+    // ba_options.solver_options.num_threads = num_eff_threads;
+
+    Reconstruction& global_recon = reconstruction_manager_->Get(0);
+    
+    const std::vector<image_t>& reg_image_ids = global_recon.RegImageIds();
+
+    CHECK_GE(reg_image_ids.size(), 2) << "At least two images must be "
+                                         "registered for global bundle-adjustment";
+    
+    // Avoid degeneracies in bundle adjustment.
+    global_recon.FilterObservationsWithNegativeDepth();
+
+    // Configure bundle adjustment
+    BundleAdjustmentConfig ba_config;
+    for (const image_t image_id : reg_image_ids) {
+        ba_config.AddImage(image_id);
+    }
+
+    // Fix 7-DOFs of the bundle adjustment problem.
+    ba_config.SetConstantPose(reg_image_ids[0]);
+    ba_config.SetConstantTvec(reg_image_ids[1], {0});
+
+    EIGEN_STL_UMAP(point3D_t, Point3D) points3d = global_recon.Points3D();
+    std::unordered_set<point3D_t> tracks_to_optimize;
+    if (options_.select_tracks_for_bundle_adjustment) {
+        SelectGoodTracksForBundleAdjustment(global_recon,
+                                            options_.long_track_length_threshold,
+                                            options_.image_grid_cell_size_pixels,
+                                            options_.min_num_optimized_tracks_per_view,
+                                            &tracks_to_optimize);
+        
+        for (const auto& point3d : points3d) {
+            if (tracks_to_optimize.count(point3d.first) != 0) {
+                ba_config.AddVariablePoint(point3d.first);
+            } else {
+                ba_config.AddConstantPoint(point3d.first);
+            }
+        }
+    } else {
+        for (const auto& point3d : points3d) {
+            ba_config.AddVariablePoint(point3d.first);
+        }
+    }
+
+    // Run bundle adjustment.
+    BundleAdjuster bundle_adjuster(ba_options, ba_config);
+    if (!bundle_adjuster.Solve(&global_recon)) {
+        return false;
+    }
+
+    LOG(INFO) << "Selected " << tracks_to_optimize.size() << " to optimize.";
+    LOG(INFO) << "Total tracks: " << points3d.size();
+
+    // Normalize scene for numerical stability and
+    // to avoid large scale changes in viewer.
+    global_recon.Normalize();
+
+    return true;
 }
 
 void DistributedMapperController::ExportUntransformedLocalRecons(

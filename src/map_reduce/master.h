@@ -9,6 +9,7 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include <fstream>
 
 #include "map_reduce/communicator.h"
 #include "map_reduce/running_info.h"
@@ -16,6 +17,7 @@
 #include "map_reduce/map_reduce_result.h"
 #include "util/threading.h"
 #include "util/timer.h"
+#include "util/misc.h"
 
 #include <glog/logging.h>
 
@@ -48,6 +50,68 @@ public:
         rpc::client c(map_reduce_config_.server_ips[id],
                       map_reduce_config_.server_ports[id]);
         c.async_call("Stop");
+    }
+
+    inline void CallSaveImages(const int id,
+                               const std::string& master_image_path,
+                               const std::string& worker_image_path,
+                               const std::vector<std::string>& image_names)
+    {
+        rpc::client c(map_reduce_config_.server_ips[id],
+                      map_reduce_config_.server_ports[id]);
+        for (auto image_name : image_names) {
+            std::fstream is(
+                colmap::JoinPaths(master_image_path, image_name).c_str(), 
+                std::ifstream::in | std::ifstream::binary);
+            // Compute buffer length.
+            is.seekg(0, is.end);
+            int length = is.tellg();
+            is.seekg(0, is.beg);
+
+            // Create buffers.
+            // char* buffer = new char [length];
+            std::vector<char> buffer(length);
+
+            // Read image to buffer.
+            is.read(buffer.data(), length);
+
+            // Remote procedure call to save image.
+            c.call("SaveImage", worker_image_path, image_name, buffer, length);
+
+            // delete [] buffer;
+            is.close();
+        }
+    }
+
+    inline void CallSaveImages(const int id,
+                               const std::string& master_image_path,
+                               const std::string& worker_image_path,
+                               const std::unordered_set<std::string>& image_names)
+    {
+        rpc::client c(map_reduce_config_.server_ips[id],
+                      map_reduce_config_.server_ports[id]);
+        for (auto image_name : image_names) {
+            std::fstream is(
+                colmap::JoinPaths(master_image_path, image_name).c_str(), 
+                std::ifstream::in | std::ifstream::binary);
+            // Compute buffer length.
+            is.seekg(0, is.end);
+            int length = is.tellg();
+            is.seekg(0, is.beg);
+
+            // Create buffers.
+            // char* buffer = new char [length];
+            std::vector<char> buffer(length);
+
+            // Read image to buffer.
+            is.read(buffer.data(), length);
+
+            // Remote procedure call to save image.
+            c.call("SaveImage", worker_image_path, image_name, buffer, length);
+
+            // delete [] buffer;
+            is.close();
+        }
     }
 
 protected:

@@ -1,4 +1,7 @@
 #include "map_reduce/worker.h"
+
+#include <fstream>
+
 #include "rpc/this_server.h"
 
 namespace GraphSfM {

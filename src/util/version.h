@@ -38,8 +38,8 @@ namespace colmap {
 
 const static std::string COLMAP_VERSION = "3.6";
 const static int COLMAP_VERSION_NUMBER = 3600;
-const static std::string COLMAP_COMMIT_ID = "d8b7785";
-const static std::string COLMAP_COMMIT_DATE = "2020-01-10";
+const static std::string COLMAP_COMMIT_ID = "b4f4717";
+const static std::string COLMAP_COMMIT_DATE = "2020-03-18";
 
 std::string GetVersionInfo();
 
