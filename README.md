@@ -122,28 +122,76 @@ cd build/src/exe
 The file format should follow:
 ```txt
 server_num
-ip1 port1
-ip2 port2
+ip1 port1 image_path1
+ip2 port2 image_path2
 ... ...
 ```
 
 (3) At last, start our master
 ```sh
+cd GraphSfM_PATH/scripts/shell
 # The project folder must contain a folder "images" with all the images.
 DATASET_PATH=/path/to/project
-CONFIG_FILE_PATH=/path/to/config.txt
+CONFIG_FILE_PATH=/path_to_config_file
+num_images_ub=100
+log_folder=/path_to_log_dir
 
-./colmap distributed_mapper $DATASET_PATH/Master \
-                            --database_path=$DATASET_PATH/database.db \
-                            --image_path=$DATASET_PATH/images \
-                            --output_path=$DATASET_PATH/Master \
-                            --distributed=1 \
-                            --config_file_name=$CONFIG_FILE_PATH \ 
-                            --num_images_ub=$num_images_ub \
-                            --graph_dir=$output_path \
-                            --cluster_type=NCUT \
-                            --num_workers=8
+./distributed_sfm sh $DATASET_PATH $num_images_ub $log_folder $CONFIG_FILE_PATH
 ```
+
+The `distributed_sfm.sh` actually executes the following command in SfM module:
+```sh
+/home/chenyu/Projects/Disco/build/src/exe/colmap distributed_mapper \
+$DATASET_PATH/$log_folder \
+--database_path=$DATASET_PATH/database.db \
+--transfer_images_to_server=1 \
+--image_path=$DATASET_PATH/images \
+--output_path=$DATASET_PATH/$log_folder \
+--config_file_name=$CONFIG_FILE_PATH/config.txt \
+--num_workers=8 \
+--distributed=1 \
+--repartition=0 \
+--assign_cluster_id=1 \
+--write_binary=1 \
+--retriangulate=0 \
+--final_ba=1 \
+--select_tracks_for_bundle_adjustment=1 \
+--long_track_length_threshold=10 \
+--graph_dir=$DATASET_PATH/$log_folder \
+--num_images_ub=$num_images_ub \
+--completeness_ratio=0.7 \
+--relax_ratio=1.3 \
+--cluster_type=SPECTRA
+```
+The parameters need to be reset for different purpose:
+- `--transfer_images_to_server`: The option decides whether to transfer images that are stored on
+master's disk to workers' disks. If we want to execute a further MVS process, we want this option to be set to `1`, because each worker that execute MVS needs to access the raw images.
+
+- `--distributed`: This option decides the SfM module runs in distributed mode or sequential mode.
+For example, if we just have one computer, we should set it to `0`, then SfM would run in sequential mode and allows you to reconstruct large scale images on a single computer. If we set it to `1`, we must ensure the `--config_file_name` option is valid, so that we we run SfM among
+a lot of computers, which in a really distributed mode.
+
+- `assign_cluster_id`: We use this option to indicate the program to assign each image with a
+`cluster_id`, if we divide images into several clusters. This option allows us to render different
+image poses that are clustered in different clusters by different colors.
+
+- `write_binary`: This option indicates to save the SfM results in text format or in binary format.
+
+- `final_ba`: This option indicates whether to perform a final bundle adjustment after merging all
+local maps. As a very large scale map requires much time to optimize scene structures and camera poses, users should tune this option by their need.
+
+- `select_tracks_for_bundle_adjustment`: As the final bundle adjustment requires too much time, we can select good tracks to optimize and achieves a comparable accuracy as full bundle adjustment.
+
+- `long_track_length_threshold`: The maximum track length when selects good tracks for bundle adjustment.
+
+- `num_images_ub`: The maximum number of images in each cluster.
+
+- `completeness_ratio`: This option indicate the overlapping between clusters. 0.5~0.7 is enough 
+in practice.
+
+- `cluster_type`: This option decides which cluster method we choose for image clustering. We support `NCut` and `Spectral` Clustering. `Spectra` clustering is more accurate than `NCut` but
+it would be slow if we want to divide images into many clusters, as it needs much time to compute
+eigen vectors.
 
 If succeed, camera poses and sparse points should be included in `$DATASET/Master` folder, you can use COLMAP's GUI to 
 import it and show the visual result:
@@ -156,12 +204,20 @@ For large scale reconstruction, our `GraphSfM` is highly recommended, these para
 
 ## ChangeLog
 
+- 2020.04.10
+    - Spectral clustering for image clustering.
+    - Select good tracks for final bundle adjustment.
+    - Image transfer from master to workers.
+    - Extract largest connected component for Structure-from-Motion.
+
 - 2020.03.06
+    - Assign different colors for images in different clusters.
+    - Support rendering image poses by different colors in ui.
     - map reduce implementation for distributed Structure-from-Motion.
 
 - 2019.11.26
-    - Image Clustering algorithms: NCut, Spectral Clustering (Upcoming)
-    - Graph-based sub-reconstruction Merging algorithm
+    - Image Clustering algorithms: NCut, Spectral Clustering (Updated in latest version).
+    - Graph-based sub-reconstruction Merging algorithm.
 
 
 ## Licence
