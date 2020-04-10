@@ -836,12 +836,24 @@ int RunDistributedMapper(int argc, char** argv)
                               &distributed_options.database_path);
     options.AddRequiredOption("image_path", &distributed_options.image_path);
     options.AddRequiredOption("output_path", &output_path);
+    options.AddDefaultOption("transfer_images_to_server", 
+                             &distributed_options.transfer_images_to_server);
     options.AddDefaultOption("num_workers", &distributed_options.num_workers);
     options.AddDefaultOption("distributed", &distributed_options.distributed);
     options.AddDefaultOption("config_file_name", &config_file_name);
     options.AddDefaultOption("repartition", &distributed_options.is_repartition_for_mvs);
     options.AddDefaultOption("assign_cluster_id", &distributed_options.assign_cluster_id);
     options.AddDefaultOption("write_binary", &distributed_options.write_binary);
+    options.AddDefaultOption("retriangulate", &distributed_options.retriangulate);
+    options.AddDefaultOption("final_ba", &distributed_options.final_ba);
+    options.AddDefaultOption("select_tracks_for_bundle_adjustment",
+                             &distributed_options.select_tracks_for_bundle_adjustment);
+    options.AddDefaultOption("long_track_length_threshold", 
+                             &distributed_options.long_track_length_threshold);
+    options.AddDefaultOption("image_grid_cell_size_pixels", 
+                             &distributed_options.image_grid_cell_size_pixels);
+    options.AddDefaultOption("min_num_optimized_tracks_per_view", 
+                             &distributed_options.min_num_optimized_tracks_per_view);
     options.AddDefaultOption("image_overlap", &clustering_options.image_overlap);
     options.AddDefaultOption("num_images_ub",
                              &clustering_options.num_images_ub);
