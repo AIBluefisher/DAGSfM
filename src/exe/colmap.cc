@@ -40,6 +40,7 @@
 #include "controllers/automatic_reconstruction.h"
 #include "controllers/bundle_adjustment.h"
 #include "controllers/hierarchical_mapper.h"
+#include "controllers/sfm_aligner.h"
 #include "controllers/distributed_mapper_controller.h"
 #include "estimators/coordinate_frame.h"
 #include "feature/extraction.h"
@@ -48,9 +49,11 @@
 #include "retrieval/visual_index.h"
 #include "ui/main_window.h"
 #include "util/opengl_utils.h"
+#include "util/reconstruction_io.h"
 #include "util/version.h"
 
 using namespace colmap;
+using namespace GraphSfM;
 
 DEFINE_string(log_directory, "", "directory to store log file.");
 
@@ -938,6 +941,149 @@ int RunLocalSfMWorker(int argc, char** argv) {
   std::cin.ignore();
 
   return EXIT_SUCCESS;
+}
+
+int RunSfMAligner(int argc, char** argv) {
+    std::string reconstructions_path;
+    bool assign_color_for_clusters;
+    FLAGS_log_dir = argv[1];
+
+    OptionManager options;
+    options.AddRequiredOption("reconstructions_path", &reconstructions_path);
+    options.AddDefaultOption("assign_color_for_clusters", &assign_color_for_clusters);
+    options.AddMapperOptions();
+    options.Parse(argc, argv);
+
+    std::vector<Reconstruction*> recons;
+
+    const std::vector<std::string> dirs = GetRecursiveDirList(reconstructions_path);
+    recons.reserve(dirs.size());
+    LOG(INFO) << "Loading existing maps.";
+    for (auto path : dirs) {
+        Reconstruction* recon = new Reconstruction();
+        if (ExistsFile(JoinPaths(path, "cameras.bin")) &&
+            ExistsFile(JoinPaths(path, "images.bin")) &&
+            ExistsFile(JoinPaths(path, "points3D.bin"))) {
+            recon->ReadBinary(path);
+        } else if (ExistsFile(JoinPaths(path, "cameras.txt")) &&
+                   ExistsFile(JoinPaths(path, "images.txt")) &&
+                   ExistsFile(JoinPaths(path, "points3D.txt"))) {
+            recon->ReadText(path);
+        } else {
+            LOG(WARNING) << "cameras, images, points3D files do not exist at " << path;
+            continue;
+        }
+        recons.push_back(recon);
+    }
+
+    using namespace GraphSfM;
+    SfMAligner::AlignOptions align_options;
+    align_options.assign_color_for_clusters = assign_color_for_clusters;
+    SfMAligner sfm_aligner(recons, align_options);
+
+    Node anchor_node;
+
+    if (sfm_aligner.Align()) {
+        anchor_node = sfm_aligner.GetAnchorNode();
+    }
+
+    CHECK_NE(anchor_node.id, -1);
+    CHECK_NOTNULL(recons[anchor_node.id]);
+
+    std::string output_path = JoinPaths(reconstructions_path, "merged");
+    CreateDirIfNotExists(output_path);
+
+    LOG(INFO) << "Exporting merged map to " << output_path;
+    recons[anchor_node.id]->WriteBinary(JoinPaths(output_path, "merged"));
+
+    for (uint i = 0; i < recons.size(); i++) {
+        delete recons[i];
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int RunPointCloudSegmenter(int argc, char** argv) {
+    std::string colmap_data_path;
+    std::string output_path;
+    int max_image_num;
+    bool write_binary = true;
+
+    OptionManager options;
+    options.AddRequiredOption("colmap_data_path", &colmap_data_path);
+    options.AddRequiredOption("output_path", &colmap_data_path);
+    options.AddRequiredOption("max_image_num", &max_image_num);
+    options.AddDefaultOption("write_binary", &write_binary);
+    options.Parse(argc, argv);
+
+    Reconstruction reconstruction;
+    reconstruction.Read(colmap_data_path);
+
+    using namespace GraphSfM;
+    
+    std::vector<image_t> reg_image_ids = reconstruction.RegImageIds();
+    const double epsilon = 0.9;
+
+    // Image projection centers are used to compute the weight.
+    std::vector<Eigen::Vector3d> reg_image_centers;
+    reg_image_centers.reserve(reg_image_ids.size());
+    for (auto image_id : reg_image_ids) {
+        reg_image_centers.push_back(reconstruction.Image(image_id).ProjectionCenter());
+    }
+
+    ImageCluster root_cluster;
+    root_cluster.image_ids = reg_image_ids;
+    for (uint i = 0; i < reg_image_centers.size(); i++) {
+        for (uint j = i + 1; j < reg_image_centers.size(); j++) {
+            const double diff = (reg_image_centers[i] - reg_image_centers[j]).norm();
+            if (diff > epsilon) continue;
+            const ViewIdPair view_pair = reg_image_ids[i] > reg_image_ids[j] ?
+                                         ViewIdPair(reg_image_ids[j], reg_image_ids[i]) :
+                                         ViewIdPair(reg_image_ids[i], reg_image_ids[j]);
+            root_cluster.edges[view_pair] = diff < 1e-6 ? 10000 : 10 / diff;
+        }
+    }
+
+    // Configure image cluster.
+    ImageClustering::Options cluster_options;
+    cluster_options.cluster_type = "NCUT";
+
+    // Segment sparse point clouds and camera poses.
+    ImageClustering image_cluster(cluster_options, root_cluster);
+    image_cluster.Cut();
+
+    std::vector<ImageCluster> intra_clusters = image_cluster.GetIntraClusters();
+    for (uint i = 0; i < intra_clusters.size(); i++) {
+        const std::string reconstruction_path = JoinPaths(output_path, 
+                                                  "segment" + std::to_string(i));
+        CreateDirIfNotExists(reconstruction_path);
+
+        EIGEN_STL_UMAP(camera_t, class Camera) cameras = reconstruction.Cameras();;
+        EIGEN_STL_UMAP(image_t, class Image) images;
+        EIGEN_STL_UMAP(point3D_t, class Point3D) points3D;
+
+        const std::vector<image_t> image_ids = intra_clusters[i].image_ids;
+        for (auto image_id : image_ids) {
+            images[image_id] = reconstruction.Image(image_id);
+            for (const Point2D point2D : images[image_id].Points2D()) {
+                if (point2D.HasPoint3D()) {
+                    points3D[point2D.Point3DId()] = reconstruction.Point3D(point2D.Point3DId());
+                }
+            }
+        }
+        
+        if (write_binary) {
+            WriteCamerasBinary(cameras, JoinPaths(reconstruction_path, "cameras.bin"));
+            WriteImagesBinary(images, JoinPaths(reconstruction_path, "images.bin"));
+            WritePoints3DBinary(points3D, JoinPaths(reconstruction_path, "points3D.bin"));
+        } else {
+            WriteCamerasText(cameras, JoinPaths(reconstruction_path, "cameras.txt"));
+            WriteImagesText(images, JoinPaths(reconstruction_path, "images.txt"));
+            WritePoints3DText(images, points3D, JoinPaths(reconstruction_path, "points3D.txt"));
+        }
+    }
+
+    return EXIT_SUCCESS;
 }
 
 int RunMatchesImporter(int argc, char** argv) {
@@ -1987,6 +2133,8 @@ int main(int argc, char** argv) {
   commands.emplace_back("hierarchical_mapper", &RunHierarchicalMapper);
   commands.emplace_back("distributed_mapper", &RunDistributedMapper);
   commands.emplace_back("local_sfm_worker", &RunLocalSfMWorker);
+  commands.emplace_back("sfm_aligner", &RunSfMAligner);
+  commands.emplace_back("point_cloud_segmenter", &RunPointCloudSegmenter);
   commands.emplace_back("image_deleter", &RunImageDeleter);
   commands.emplace_back("image_filterer", &RunImageFilterer);
   commands.emplace_back("image_rectifier", &RunImageRectifier);
