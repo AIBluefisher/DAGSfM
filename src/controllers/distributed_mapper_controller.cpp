@@ -344,7 +344,13 @@ bool DistributedMapperController::RunDistributed()
     // Determine the number of workers and threads per worker
     LOG(INFO) << "Sub-reconstructions size: " << reconstructions.size();
     #ifdef __DEBUG__
+        LOG(INFO) << "Extracting colors for local maps.";
+        for (Reconstruction* reconstruction : reconstructions) {
+            ExtractColors(options_.image_path, reconstruction);
+        }
         ExportUntransformedLocalRecons(reconstructions);
+        LOG(INFO) << "Local reconstructions are exported to "
+                       << options_.output_path;
     #endif
 
     const int kMaxNumThreads = -1;
@@ -569,7 +575,13 @@ void DistributedMapperController::ReconstructPartitions(
             }
         }
     #ifdef __DEBUG__
+        LOG(INFO) << "Extracting colors for local maps.";
+        for (Reconstruction* reconstruction : reconstructions) {
+            ExtractColors(options_.image_path, reconstruction);
+        }
         ExportUntransformedLocalRecons(reconstructions);
+        LOG(INFO) << "Local reconstructions are exported to "
+               << options_.output_path;
     #endif
     }
 }
