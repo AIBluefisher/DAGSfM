@@ -1,7 +1,7 @@
 DATASET_PATH=$1
 num_images_ub=$2
 log_folder=$3
-completeness_ratio=$4
+# completeness_ratio=$4
 #VOC_TREE_PATH=$5
 # image_overlap=$3
 # max_num_cluster_pairs=$4
@@ -32,12 +32,21 @@ completeness_ratio=$4
 /home/amax/Projects/colmap/build/src/exe/colmap distributed_mapper \
 $DATASET_PATH/$log_folder \
 --database_path=$DATASET_PATH/database.db \
+--transfer_images_to_server=0 \
 --image_path=$DATASET_PATH/images \
---output_path=$DATASET_PATH/sparse \
+--output_path=$DATASET_PATH/$log_folder \
 --num_workers=8 \
+--distributed=0 \
+--repartition=0 \
+--assign_cluster_id=1 \
+--write_binary=1 \
+--retriangulate=0 \
+--final_ba=0 \
+--select_tracks_for_bundle_adjustment=1 \
+--long_track_length_threshold=10 \
 --graph_dir=$DATASET_PATH/$log_folder \
 --num_images_ub=$num_images_ub \
---completeness_ratio=$completeness_ratio \
+--completeness_ratio=0.7 \
 --relax_ratio=1.3 \
---cluster_type=NCUT
+--cluster_type=NCUT # SPECTRA
 # --image_overlap=$image_overlap \
