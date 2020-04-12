@@ -396,6 +396,13 @@ void ImageClustering::AddLostEdgesBetweenClusters(ImageCluster& cluster1,
                                  ImageCluster& cluster2,
                                  std::vector<graph::Edge>& lost_edges)
 {
+    // The intersection of cluster1 and cluster2 can't surpass the
+    // maximum image overlapping.
+    if (CommonImagesNum(cluster1, cluster2) > options_.image_overlap) {
+        return;
+    }
+
+    // Either cluster1 or cluster2 should not achieve the completeness ratio.
     if (IsSatisfyCompletenessRatio(cluster1) && 
         IsSatisfyCompletenessRatio(cluster2)) {
         return;
@@ -407,7 +414,7 @@ void ImageClustering::AddLostEdgesBetweenClusters(ImageCluster& cluster1,
     std::sort(lost_edges.begin(), lost_edges.end(), cmp);
 
     RandomNumberGenerator rng;
-    for (uint k = 0; k < options_.image_overlap && k < lost_edges.size(); k++) {
+    for (uint k = 0; k < lost_edges.size(); k++) {
         const ViewIdPair view_pair = lost_edges[k].src < lost_edges[k].dst
                                      ? ViewIdPair(lost_edges[k].src, lost_edges[k].dst)
                                      : ViewIdPair(lost_edges[k].dst, lost_edges[k].src);
