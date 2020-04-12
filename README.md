@@ -202,7 +202,31 @@ For small scale reconstruction, you can set the `$num_images_ub` equal to the nu
 
 For large scale reconstruction, our `GraphSfM` is highly recommended, these parameters should be tuned carefully: larger `$num_images_ub` and `$completeness_ratio` can make reconstruction more robust, but also may lead to low efficiency and even degenerate to incremental one.
 
+### Segment large scale maps
+In some cases where we have a very large scale map, such that a latter Multi-View Stereo becomes
+infeasible because of memory limitation. We can use the `point_cloud_segmenter` to segment original
+map that is stored in colmap format into multiple small maps.
+ ```sh
+./build/src/exe/colmap point_cloud_segmenter \
+--colmap_data_path=path_to_colmap_data \ 
+--output_path=path_to_store_small_maps \
+--max_image_num=max_number_image_for_small_map \
+--write_binary=1
+```
+
+Before running this command, make sure `path_to_colmap_data` contains `images.txt`, `cameras.txt`, `points3D.txt` or `images.bin`, `cameras.bin`, `points3D.bin`.
+- `max_image_num`: As colmap data includes images data, where store all registered images' data. We
+limit the image number of each small map, and use this parameter to segment large maps. Though it's better to use the number of point clouds in practice, we haven't release the related implementation and we will enhance this helper further.
+
+- 'write_binary`: set to `1` if save colmap data in binary format, or set to `0` to save colmap data in text format.
+
 ## ChangeLog
+
+- 2020.04.11
+    - Interface for extracting largest connected component in graph implementation.
+    - Merge largest connected component in SfMAligner.
+    - Command line helper for merging multiple local maps.
+    - Command line helper for segmenting large scale map into several sub-maps.
 
 - 2020.04.10
     - Spectral clustering for image clustering.

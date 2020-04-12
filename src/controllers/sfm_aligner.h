@@ -25,6 +25,8 @@ public:
     const static std::vector<BitmapColor<float>> ColorContainers;
     struct AlignOptions
     {
+        bool merge_largest_cc = true;
+
         double threshold = 0.1;
 
         double confidence = 0.99;
@@ -88,7 +90,7 @@ private:
 
     void ComputePath(int src, int dst);
 
-    void MergeReconstructions();
+    void MergeReconstructions(std::vector<size_t>& node_ids);
 };
 
 } // namespace GraphSfM

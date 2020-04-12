@@ -253,27 +253,29 @@ bool SfMAligner::Align()
     // or we couldn't stitch all reconstructions together due to 
     // too large alignment error or disconnected components.
     if (recons_graph_.GetEdgesNum() < recons_graph_.GetNodesNum() - 1) {
-        LOG(ERROR) << "Can't align all reconstructions together due to "
-                   << "too large alignment error or disconnected components";
-
-        return false;
+        LOG(WARNING) << "Can't align all reconstructions together due to "
+                     << "too large alignment error or disconnected components."
+                     << "We would just merge local maps in the largest connected components.";
+    }
+    const Graph<Node, Edge> largest_cc = recons_graph_.ExtractLargestCC();
+    std::vector<size_t> vec_largest_cc_nodes;
+    vec_largest_cc_nodes.reserve(largest_cc.GetNodes().size());
+    for (auto node_it : largest_cc.GetNodes()) {
+        vec_largest_cc_nodes.push_back(node_it.first);
     }
 
     // 2. Constructing a minimum spanning tree, thus we can select the
     // most accurate n - 1 edges for accurate alignment.
     LOG(INFO) << "Finding Minimum Spanning Tree...";
     timer.Start();
-    std::vector<Edge> mst_edges = recons_graph_.Kruskal();
+    std::vector<Edge> mst_edges = largest_cc.Kruskal();
 
     Graph<Node, Edge> mst;
-    for (auto node : recons_graph_.GetNodes()) {
-        mst.AddNode(node.second);
-    }
     for (const auto edge : mst_edges) {
         mst.AddEdge(edge);
     }
 
-    if (mst_edges.size() < recons_graph_.GetNodesNum() - 1) {
+    if (mst_edges.size() < largest_cc.GetNodesNum() - 1) {
         LOG(WARNING) << "Invalid MST";
         mst.ShowInfo();
         return false;
@@ -293,7 +295,7 @@ bool SfMAligner::Align()
     // 4. Compute the final transformation to anchor node for each cluster
     LOG(INFO) << "Computing Final Similarity Transformations...";
     timer.Start();
-    for (uint i = 0; i < reconstructions_.size(); i++) {
+    for (auto i : vec_largest_cc_nodes) {
         if (static_cast<int>(i) != anchor_node_.id) {
             this->ComputePath(i, anchor_node_.id);
         }
@@ -305,7 +307,7 @@ bool SfMAligner::Align()
     // 5. Merging all other reconstructions to anchor node
     LOG(INFO) << "Merging Reconstructions...";
     timer.Start();
-    this->MergeReconstructions();
+    this->MergeReconstructions(vec_largest_cc_nodes);
     timer.Pause();
     summary_.merging_time = timer.ElapsedSeconds();
 
@@ -511,11 +513,13 @@ void SfMAligner::ComputePath(int src, int dst)
     LOG(INFO) << "\n";
 }
 
-void SfMAligner::MergeReconstructions()
+void SfMAligner::MergeReconstructions(std::vector<size_t>& node_ids)
 {
     if (options_.assign_color_for_clusters) {
         for (size_t i = 0; i < reconstructions_.size(); i++) {
-            reconstructions_[i]->AssignColorsForAllPoints(SfMAligner::ColorContainers[i]);
+            const int color_id = i % SfMAligner::ColorContainers.size();
+            reconstructions_[i]->AssignColorsForAllPoints(
+                SfMAligner::ColorContainers[color_id]);
             // // Assign cluster id for each image.
             // const std::vector<image_t> reg_image_ids = reconstructions_[i]->RegImageIds();
             // for (auto image_id : reg_image_ids) {
@@ -525,15 +529,15 @@ void SfMAligner::MergeReconstructions()
         }
     }
 
-    for (uint i = 0; i < reconstructions_.size(); i++) {
-        if (static_cast<int>(i) == anchor_node_.id) { continue; }
+    for (auto id : node_ids) {
+        if (static_cast<int>(id) == anchor_node_.id) { continue; }
 
-        Sim3 sim3 = sim3_to_anchor_[i];
+        Sim3 sim3 = sim3_to_anchor_[id];
         Eigen::Matrix3x4d alignment;
         alignment.block(0, 0, 3, 3) = sim3.s * sim3.R;
         alignment.block(0, 3, 3, 1) = sim3.t;
 
-        reconstructions_[anchor_node_.id]->Merge(*reconstructions_[i],
+        reconstructions_[anchor_node_.id]->Merge(*reconstructions_[id],
                                                  alignment);
     }
 }
