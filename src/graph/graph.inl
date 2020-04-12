@@ -468,6 +468,55 @@ void Graph<T1, T2>::ShowInfo(const std::string& filename) const
 }
 
 template <typename T1, typename T2>
+Graph<T1, T2> Graph<T1, T2>::ExtractLargestCC() const
+{
+    graph::UnionFind uf(_nodes.size());
+
+    std::vector<size_t> node_ids;
+    node_ids.reserve(_nodes.size());
+    for (auto node_it : _nodes) {
+        node_ids.push_back(node_it.first);
+    }
+    uf.InitWithNodes(node_ids);
+
+    for (auto it = _edges.begin(); it != _edges.end(); ++it) {
+        auto em = it->second;
+        for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
+            uf.Union(em_it->second.src, em_it->second.dst);
+        }
+    }
+
+    std::unordered_map<size_t, std::unordered_set<size_t>> components;
+    for (auto node_id : node_ids) {
+        const size_t parent_id = uf.FindRoot(node_id);
+        components[parent_id].insert(node_id);
+    }
+
+    size_t num_largest_component = 0;
+    size_t largest_component_id;
+    for (const auto& it : components) {
+        if (num_largest_component < it.second.size()) {
+            num_largest_component = it.second.size();
+            largest_component_id = it.first;
+        }
+    }
+
+    Graph<T1, T2> largest_cc;
+    for (auto it = _edges.begin(); it != _edges.end(); ++it) {
+        auto em = it->second;
+        for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
+            if (components[largest_component_id].count(em_it->second.src) == 0 ||
+                components[largest_component_id].count(em_it->second.dst) == 0) {
+                continue;
+            }
+            largest_cc.AddEdge(em_it->second);
+        }
+    }
+
+    return largest_cc;
+}
+
+template <typename T1, typename T2>
 size_t Graph<T1, T2>::FindConnectedComponents() const
 {
     std::unordered_map<size_t, bool> visited;

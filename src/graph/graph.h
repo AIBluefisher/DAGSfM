@@ -188,6 +188,8 @@ public:
     void ShowInfo(const std::string& filename) const;
     // void GraphVisual() const;
 
+    Graph<T1, T2> ExtractLargestCC() const;
+
     size_t FindConnectedComponents() const;
 
 // private:
