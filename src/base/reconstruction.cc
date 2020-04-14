@@ -1857,7 +1857,7 @@ void Reconstruction::WriteImagesText(const std::string& path) const
     CHECK(file.is_open()) << path;
 
     file << "# Image list with two lines of data per image:" << std::endl;
-    file << "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, "
+    file << "#   IMAGE_ID, CLUSTER_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, "
             "NAME"
          << std::endl;
     file << "#   POINTS2D[] as (X, Y, POINT3D_ID)" << std::endl;
