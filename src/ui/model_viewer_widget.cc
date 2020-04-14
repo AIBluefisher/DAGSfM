@@ -879,6 +879,7 @@ void ModelViewerWidget::UploadImageData(const bool selection_mode) {
   for (const image_t image_id : reg_image_ids) {
     const Image& image = images[image_id];
     const Camera& camera = cameras[image.CameraId()];
+    const size_t& cluster_id = images[image_id].ClusterId();
 
     Eigen::Vector4f plane_color;
     Eigen::Vector4f frame_color;
@@ -892,7 +893,7 @@ void ModelViewerWidget::UploadImageData(const bool selection_mode) {
         plane_color = kSelectedImagePlaneColor;
         frame_color = kSelectedImageFrameColor;
       } else {
-        image_colormap_->ComputeColor(image, &plane_color, &frame_color);
+        image_colormap_->ComputeColor(image, &plane_color, &frame_color, cluster_id);
       }
     }
 

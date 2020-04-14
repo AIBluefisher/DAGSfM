@@ -128,10 +128,13 @@ class ImageColormapBase {
                        std::vector<image_t>& reg_image_ids) = 0;
 
   virtual void ComputeColor(const Image& image, Eigen::Vector4f* plane_color,
-                            Eigen::Vector4f* frame_color) = 0;
+                            Eigen::Vector4f* frame_color,
+                            size_t cluster_id = 0) = 0;
 
   const static Eigen::Vector4f kDefaultPlaneColor;
   const static Eigen::Vector4f kDefaultFrameColor;
+  const static std::vector<Eigen::Vector4f> PlaneColors;
+  const static std::vector<Eigen::Vector4f> FrameColors;
 };
 
 // Use uniform color for all images.
@@ -143,7 +146,8 @@ class ImageColormapUniform : public ImageColormapBase {
                std::vector<image_t>& reg_image_ids) override;
 
   void ComputeColor(const Image& image, Eigen::Vector4f* plane_color,
-                    Eigen::Vector4f* frame_color) override;
+                    Eigen::Vector4f* frame_color,
+                    size_t cluster_id = 0) override;
 
   Eigen::Vector4f uniform_plane_color = kDefaultPlaneColor;
   Eigen::Vector4f uniform_frame_color = kDefaultFrameColor;
@@ -162,7 +166,8 @@ class ImageColormapNameFilter : public ImageColormapBase {
                        const Eigen::Vector4f& frame_color);
 
   void ComputeColor(const Image& image, Eigen::Vector4f* plane_color,
-                    Eigen::Vector4f* frame_color) override;
+                    Eigen::Vector4f* frame_color,
+                    size_t cluster_id = 0) override;
 
  private:
   // The plane and frame colors for different words.

@@ -208,6 +208,25 @@ const Eigen::Vector4f ImageColormapBase::kDefaultPlaneColor = {1.0f, 0.1f, 0.0f,
 const Eigen::Vector4f ImageColormapBase::kDefaultFrameColor = {0.8f, 0.1f, 0.0f,
                                                                1.0f};
 
+const std::vector<Eigen::Vector4f> 
+ImageColormapBase::PlaneColors = {
+   {1.0f, 0.1f, 0.0f, 0.6f}, {0.0f, 1.0f, 1.0f, 0.6f},
+   {1.0f, 0.4f, 0.0f, 0.6f}, {0.6f, 0.2f, 0.8f, 0.6f},
+   {0.0f, 1.0f, 0.2f, 0.6f}, {1.0f, 0.0f, 0.8f, 0.6f},
+   {1.0f, 1.0f, 0.0f, 0.6f}, {1.0f, 0.6f, 1.0f, 0.6f},
+   {1.0f, 0.2f, 0.0f, 0.6f}, {0.0f, 0.8f, 1.0f, 0.6f},
+   {1.0f, 0.8f, 1.0f, 0.6f}
+};
+const std::vector<Eigen::Vector4f> 
+ImageColormapBase::FrameColors = {
+    {1.0f, 0.1f, 0.0f, 1.0f}, {0.0f, 1.0f, 1.0f, 1.0f},
+    {1.0f, 0.4f, 0.0f, 1.0f}, {0.6f, 0.2f, 0.8f, 1.0f},
+    {0.0f, 1.0f, 0.2f, 1.0f}, {1.0f, 0.0f, 0.8f, 1.0f},
+    {1.0f, 1.0f, 0.0f, 1.0f}, {1.0f, 0.6f, 1.0f, 1.0f},
+    {1.0f, 0.2f, 0.0f, 1.0f}, {0.0f, 0.8f, 1.0f, 1.0f},
+    {1.0f, 0.8f, 1.0f, 1.0f}
+};
+
 ImageColormapBase::ImageColormapBase() {}
 
 void ImageColormapUniform::Prepare(EIGEN_STL_UMAP(camera_t, Camera) & cameras,
@@ -218,9 +237,14 @@ void ImageColormapUniform::Prepare(EIGEN_STL_UMAP(camera_t, Camera) & cameras,
 
 void ImageColormapUniform::ComputeColor(const Image& image,
                                         Eigen::Vector4f* plane_color,
-                                        Eigen::Vector4f* frame_color) {
-  *plane_color = uniform_plane_color;
-  *frame_color = uniform_frame_color;
+                                        Eigen::Vector4f* frame_color,
+                                        size_t cluster_id) {
+    //     *plane_color = uniform_plane_color;
+    //     *frame_color = uniform_frame_color;
+    // std::cout << "Compute Color with cluster id: " << cluster_id << "\n";
+    const int size = PlaneColors.size();
+    *plane_color = PlaneColors[cluster_id % size];
+    *frame_color = FrameColors[cluster_id % size];
 }
 
 void ImageColormapNameFilter::Prepare(EIGEN_STL_UMAP(camera_t, Camera) &
@@ -239,7 +263,8 @@ void ImageColormapNameFilter::AddColorForWord(
 
 void ImageColormapNameFilter::ComputeColor(const Image& image,
                                            Eigen::Vector4f* plane_color,
-                                           Eigen::Vector4f* frame_color) {
+                                           Eigen::Vector4f* frame_color,
+                                           size_t cluster_id) {
   for (const auto& image_name_color : image_name_colors_) {
     if (StringContains(image.Name(), image_name_color.first)) {
       *plane_color = image_name_color.second.first;
