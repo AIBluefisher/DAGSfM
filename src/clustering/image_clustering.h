@@ -74,8 +74,6 @@ public:
 
         std::string cluster_type = "NCUT";
 
-        std::string graph_dir = "";
-
         bool Check() const;
     };
 

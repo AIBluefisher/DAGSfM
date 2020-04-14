@@ -103,6 +103,7 @@ inline void WriteImagesText(
         std::string line_string;
 
         line << image.first << " ";
+        line << image.second.ClusterId() << " ";
 
         // QVEC (qw, qx, qy, qz)
         const Eigen::Vector4d normalized_qvec =
@@ -215,6 +216,7 @@ inline void WriteImagesBinary(
         }
 
         WriteBinaryLittleEndian<image_t>(&file, image.first);
+        WriteBinaryLittleEndian<image_t>(&file, image.second.ClusterId());
 
         const Eigen::Vector4d normalized_qvec =
             NormalizeQuaternion(image.second.Qvec());

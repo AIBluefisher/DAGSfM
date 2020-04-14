@@ -864,7 +864,6 @@ int RunDistributedMapper(int argc, char** argv)
     options.AddDefaultOption("relax_ratio", &clustering_options.relax_ratio);
     options.AddDefaultOption("max_num_cluster_pairs", &clustering_options.max_num_cluster_pairs);
     options.AddDefaultOption("cluster_type", &clustering_options.cluster_type);
-    options.AddDefaultOption("graph_dir", &clustering_options.graph_dir);
     options.AddMapperOptions();
     options.Parse(argc, argv);
 
@@ -1011,7 +1010,7 @@ int RunPointCloudSegmenter(int argc, char** argv) {
 
     OptionManager options;
     options.AddRequiredOption("colmap_data_path", &colmap_data_path);
-    options.AddRequiredOption("output_path", &colmap_data_path);
+    options.AddRequiredOption("output_path", &output_path);
     options.AddRequiredOption("max_image_num", &max_image_num);
     options.AddDefaultOption("write_binary", &write_binary);
     options.Parse(argc, argv);

@@ -17,7 +17,6 @@ bool ImageClustering::Options::Check() const
     CHECK_LE(completeness_ratio, 1.0);
     CHECK_GT(num_images_ub, 0);
     CHECK_GT(branching_factor, 0);
-    CHECK_GT(graph_dir.size(), 0);
     return true;
 }
 
