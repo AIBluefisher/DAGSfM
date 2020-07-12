@@ -18,13 +18,14 @@ In our work, 3D reconstruction is deemed as a ```divide-and-conquer``` problem. 
 
 If you use this project for your research, please cite:
 ```
-@misc{chen2019graphbased,
-    title={Graph-Based Parallel Large Scale Structure from Motion},
-    author={Yu Chen and Shuhan Shen and Yisong Chen and Guoping Wang},
-    year={2019},
-    eprint={1912.10659},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@article{DBLP:journals/corr/abs-1912-10659,
+  author    = {Yu Chen and
+               Shuhan Shen and
+               Yisong Chen and
+               Guoping Wang},
+  title     = {Graph-Based Parallel Large Scale Structure from Motion},
+  journal   = {Pattern Recognition},
+  year      = {2020},
 }
 
 @inproceedings{schoenberger2016sfm,
