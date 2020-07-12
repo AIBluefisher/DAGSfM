@@ -145,10 +145,8 @@ message("-- Check for gtest")
 find_package(GTest REQUIRED)
 if (GTEST_FOUND)
    message("-- Found GTest: ${GTEST_INCLUDE_DIRS}")
-   set(GTEST_LIBRARIES ${GTEST_LIBRARIES} 
-        /usr/local/lib/libgtest_main.a
-        /usr/local/lib/libgtest.a)
-#    message("-- Linked Libraries: ${GTEST_LIBRARIES}")
+   set(GTEST_LIBRARIES ${GTEST_MAIN_LIBRARY} ${GTEST_LIBRARY})
+   message("-- Linked Libraries: ${GTEST_MAIN_LIBRARY} ${GTEST_LIBRARY}")
 else (GTEST_FOUND)
    message(FATAL_ERROR "Can't find GTest. Please set GTEST_INCLUDE_DIRS & GTEST_LIBRARIES")
 endif (GTEST_FOUND)
