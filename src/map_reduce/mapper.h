@@ -3,12 +3,11 @@
 
 namespace GraphSfM {
 
-class Mapper
-{
-public:
-    virtual void Map(const void* input) = 0;
+class Mapper {
+ public:
+  virtual void Map(const void* input) = 0;
 };
 
-} // namespace GraphSfM
+}  // namespace GraphSfM
 
 #endif

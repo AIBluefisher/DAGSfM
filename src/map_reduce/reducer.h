@@ -3,12 +3,11 @@
 
 namespace GraphSfM {
 
-class Reducer
-{
-public:
-    virtual void Reduce(void* data) = 0;
+class Reducer {
+ public:
+  virtual void Reduce(void* data) = 0;
 };
 
-} // namespace GraphSfM
+}  // namespace GraphSfM
 
 #endif
