@@ -327,10 +327,6 @@ IncrementalMapperController::IncrementalMapperController(const IncrementalMapper
         reconstruction_manager_->Get(0).ShowReconInfo();
         return reconstruction_manager_->Get(0);
     });
-
-    server_.bind("ResetWorkerInfo", [this]() {
-        info_.Reset();
-    });
 }
 
 void IncrementalMapperController::SetDatabaseCache(DatabaseCache* database_cache)
