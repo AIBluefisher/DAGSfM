@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_BASE_VISIBILITY_PYRAMID_H_
 #define COLMAP_SRC_BASE_VISIBILITY_PYRAMID_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 #include "util/alignment.h"
 

@@ -31,9 +31,8 @@
 
 #include "base/camera_models.h"
 
-#include <unordered_map>
-
 #include <boost/algorithm/string.hpp>
+#include <unordered_map>
 
 namespace colmap {
 

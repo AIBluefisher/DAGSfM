@@ -32,15 +32,14 @@
 #ifndef COLMAP_SRC_BASE_POINT3D_H_
 #define COLMAP_SRC_BASE_POINT3D_H_
 
-#include <vector>
-
 #include <Eigen/Core>
 #include <rpc/msgpack.hpp>
+#include <vector>
 
 #include "base/track.h"
+#include "map_reduce/msgpack_adaptor.h"
 #include "util/logging.h"
 #include "util/types.h"
-#include "map_reduce/msgpack_adaptor.h"
 
 namespace colmap {
 
@@ -76,7 +75,7 @@ class Point3D {
   inline const class Track& Track() const;
   inline class Track& Track();
   inline void SetTrack(const class Track& track);
-  
+
   MSGPACK_DEFINE(xyz_, color_, error_, track_);
 
  private:

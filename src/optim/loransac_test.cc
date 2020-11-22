@@ -30,7 +30,7 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "optim/ransac"
-#include "util/testing.h"
+#include "optim/loransac.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -38,8 +38,8 @@
 #include "base/pose.h"
 #include "base/similarity_transform.h"
 #include "estimators/similarity_transform.h"
-#include "optim/loransac.h"
 #include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

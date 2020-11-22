@@ -44,7 +44,6 @@ class AutomaticReconstructionController : public Thread {
  public:
   enum class DataType { INDIVIDUAL, VIDEO, INTERNET };
   enum class Quality { LOW, MEDIUM, HIGH, EXTREME };
-  enum class Mesher { POISSON, DELAUNAY };
 
   struct Options {
     // The path to the workspace folder in which all results are stored.
@@ -74,16 +73,6 @@ class AutomaticReconstructionController : public Thread {
     // Whether to perform sparse mapping.
     bool sparse = true;
 
-// Whether to perform dense mapping.
-#ifdef CUDA_ENABLED
-    bool dense = true;
-#else
-    bool dense = false;
-#endif
-
-    // The meshing algorithm to be used.
-    Mesher mesher = Mesher::POISSON;
-
     // The number of threads to use in all stages.
     int num_threads = -1;
 
@@ -106,7 +95,6 @@ class AutomaticReconstructionController : public Thread {
   void RunFeatureExtraction();
   void RunFeatureMatching();
   void RunSparseMapper();
-  void RunDenseMapper();
 
   const Options options_;
   OptionManager option_manager_;

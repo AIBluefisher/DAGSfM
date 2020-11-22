@@ -32,6 +32,7 @@
 set(FOLDER_NAME "sfm")
 
 COLMAP_ADD_SOURCES(
+    filter_view_pairs_from_orientation.h filter_view_pairs_from_orientation.cpp
     incremental_mapper.h incremental_mapper.cc
     incremental_triangulator.h incremental_triangulator.cc
     twoview_info.h twoview_info.cpp

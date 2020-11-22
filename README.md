@@ -1,31 +1,14 @@
-# Graph Structure from Motion (GraphSfM)
-[![Join the chat at https://gitter.im/hlzz/libvot](https://badges.gitter.im/hlzz/libvot.svg)](https://gitter.im/GraphSfM/Lobby)
-![issues](https://img.shields.io/github/issues/AIBluefisher/GraphSfM.svg)
-![forks](https://img.shields.io/github/forks/AIBluefisher/GraphSfM.svg)
-![stars](https://img.shields.io/github/stars/AIBluefisher/GraphSfM.svg)
-![license](https://img.shields.io/github/license/AIBluefisher/GraphSfM.svg)
-
-
-**A similar version of GraphSfM based on [OpenMVG](https://github.com/openMVG/openMVG) has been released in: https://github.com/AIBluefisher/EGSfM.**
-
-## 1. Overview of GraphSfM
-Our Structure from Motion approach, named **`Graph Structure from Motion (GraphSfM)`**, is aimed at large scale 3D reconstruction. Besides, we aimed at exploring the computation ability of computer and making SfM easily transferred to distributed system. This work has been refactored, now it is based on [COLMAP](https://github.com/colmap/colmap). We have implemented the distributed version which is based on Map-Reduce architecture.
-
-In our work, 3D reconstruction is deemed as a ```divide-and-conquer``` problem. Our graph cluster algorithm divides images into different clusters, while images with high relativity remained in the same group. After the completion of local SfM in all clusters, an elaborate graph initialization and MST construction algorithm is designed to accurately merge clusters, and cope well with drift problems. The two proposed graph-based algorithms make SfM more efficient and robust - the graph cluster algorithm accelerate the SfM step while guarantee the robustness of clusters merging, and the MST construction makes point clouds alignment as accurate as possible. Our approach can reconstruct large scale data-set in one single machine with very high accuracy and efficiency. Based on this work, we have been successfully reconstructed Peking University (contains 12306 images) within 2 hours on a laptop, and [Trafalgar dataset](https://research.cs.cornell.edu/1dsfm/) (contains more than 15000 images, we render the camera poses in different clusters with different colors).
-
-![PKU](docs/img/pku.png)
-![Trafalgar](docs/img/trafalgar.png)
+# DAGSfM: Distributed and Graph-Based Structure-from-Motion Library
 
 If you use this project for your research, please cite:
 ```
-@article{article,
-author = {Chen, Yu and Shen, Shuhan and Chen, Yisong and Wang, Guoping},
-year = {2020},
-month = {07},
-pages = {107537},
-title = {Graph-Based Parallel Large Scale Structure from Motion},
-journal = {Pattern Recognition},
-doi = {10.1016/j.patcog.2020.107537}
+@misc{chen2019graphbased,
+    title={Graph-Based Parallel Large Scale Structure from Motion},
+    author={Yu Chen and Shuhan Shen and Yisong Chen and Guoping Wang},
+    year={2019},
+    eprint={1912.10659},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
 }
 
 @inproceedings{schoenberger2016sfm,
@@ -41,7 +24,7 @@ doi = {10.1016/j.patcog.2020.107537}
 ### 2.1 Required
 
 #### Basic Requirements
-```
+```sh
 sudo apt-get install \
     git \
     cmake \
@@ -64,6 +47,14 @@ sudo apt-get install \
     libcgal-qt5-dev
 ```
 
+#### Python Modules (Python 2.7 only)
+```sh
+sudo pip install scikit-learn tensorflow-gpu==1.7.0 scipy numpy progressbar2
+
+# if the version of scikit-learn is not compatible, upgrade it by:
+# pip install --upgrade scikit-learn
+```
+
 #### [ceres-solver]()
 
 ```sh
@@ -78,6 +69,20 @@ make
 sudo make install
 ```
 
+#### [igraph](https://igraph.org)
+[igraph](https://github.com/igraph/igraph) is used for `Community Detection` and graph visualization.
+
+```sh
+sudo apt-get install build-essential libxml2-dev
+wget https://igraph.org/nightly/get/c/igraph-0.7.1.tar.gz
+tar -xvf igraph-0.7.1.tar.gz
+cd igraph-0.7.1
+./configure
+make
+make check
+sudo make install
+```
+
 #### [rpclib](https://github.com/qchateau/rpclib)
 
 ```sh
@@ -88,11 +93,12 @@ cmake ..
 make -j8
 sudo make install
 ```
-#### Build our GraphSfM
+
+### 2.2 Build DAGSfM
 
 ```sh
-git clone https://github.com/AIBluefisher/GraphSfM.git
-cd GraphSfM
+git clone https://github.com/AIBluefisher/DAGSfM.git
+cd DAGSfM
 mkdir build && cd build
 cmake .. && make -j8
 ```
@@ -127,6 +133,7 @@ ip1 port1 image_path1
 ip2 port2 image_path2
 ... ...
 ```
+**note: image_path of each worker must be consistent with the `--output_path` option*.*
 
 (3) At last, start our master
 ```sh
@@ -145,14 +152,18 @@ The `distributed_sfm.sh` actually executes the following command in SfM module:
 /home/chenyu/Projects/Disco/build/src/exe/colmap distributed_mapper \
 $DATASET_PATH/$log_folder \
 --database_path=$DATASET_PATH/database.db \
---transfer_images_to_server=1 \
 --image_path=$DATASET_PATH/images \
 --output_path=$DATASET_PATH/$log_folder \
 --config_file_name=$CONFIG_FILE_PATH/config.txt \
 --num_workers=8 \
 --distributed=1 \
 --repartition=0 \
---assign_cluster_id=1 \
+--num_images=100 \
+--script_path=/home/chenyu/Projects/Disco/scripts/shell/similarity_search.sh \
+--dataset_path=$DATASET_PATH \
+--output_dir=$DATASET_PATH/$log_folder \
+--mirror_path=/home/chenyu/Projects/Disco/lib/mirror \
+--assign_cluster_id=0 \
 --write_binary=1 \
 --retriangulate=0 \
 --final_ba=1 \
@@ -162,8 +173,13 @@ $DATASET_PATH/$log_folder \
 --num_images_ub=$num_images_ub \
 --completeness_ratio=0.7 \
 --relax_ratio=1.3 \
---cluster_type=SPECTRA
+--cluster_type=SPECTRA #SPECTRA #NCUT COMMUNITY_DETECTION #
+# --max_num_cluster_pairs=$max_num_cluster_pairs \
+# --image_overlap=$image_overlap \
 ```
+
+Thus, you need to overwrite `/home/chenyu/Projects/Disco/build/src/exe/colmap`, `--script_path`, `--mirror_path` options by yours.
+
 The parameters need to be reset for different purpose:
 - `--transfer_images_to_server`: The option decides whether to transfer images that are stored on
 master's disk to workers' disks. If we want to execute a further MVS process, we want this option to be set to `1`, because each worker that execute MVS needs to access the raw images.
@@ -194,7 +210,7 @@ in practice.
 it would be slow if we want to divide images into many clusters, as it needs much time to compute
 eigen vectors.
 
-If succeed, camera poses and sparse points should be included in `$DATASET/Master` folder, you can use COLMAP's GUI to 
+If succeed, camera poses and sparse points should be included in `$DATASET/sparse` folder, you can use COLMAP's GUI to 
 import it and show the visual result:
 ```sh
 ./build/src/exe/colmap gui
@@ -219,62 +235,45 @@ Before running this command, make sure `path_to_colmap_data` contains `images.tx
 - `max_image_num`: As colmap data includes images data, where store all registered images' data. We
 limit the image number of each small map, and use this parameter to segment large maps. Though it's better to use the number of point clouds in practice, we haven't release the related implementation and we will enhance this helper further.
 
-- 'write_binary`: set to `1` if save colmap data in binary format, or set to `0` to save colmap data in text format.
+- 'write_binary`: set to `1`  if save colmap data in binary format, or set to  `0`  to save colmap data in text format.
 
 ## ChangeLog
 
+- 2020.06.24
+  - Refactor distributed SfM and distributed matching in a consistent architecture.
+  - Distributed matching.
+  - Replaced vocabulary tree by deep learning model.
+  - Use `Image Graph`, `Similarity Graph`, `View Graph` to handle different distributed tasks.
+
 - 2020.04.11
-    - Interface for extracting largest connected component in graph implementation.
-    - Merge largest connected component in SfMAligner.
-    - Command line helper for merging multiple local maps.
-    - Command line helper for segmenting large scale map into several sub-maps.
+  - Interface for extracting largest connected component in graph implementation.
+  - Merge largest connected component in SfMAligner.
+  - Command line helper for merging multiple local maps.
+  - Command line helper for segmenting large scale map into several sub-maps.
 
 - 2020.04.10
-    - Spectral clustering for image clustering.
-    - Select good tracks for final bundle adjustment.
-    - Image transfer from master to workers.
-    - Extract largest connected component for Structure-from-Motion.
+  - Select good tracks for final bundle adjustment.
+  - Image transfer from master to workers.
+  - Extract largest connected component for Structure-from-Motion.
 
-- 2020.03.06
-    - Assign different colors for images in different clusters.
-    - Support rendering image poses by different colors in ui.
-    - map reduce implementation for distributed Structure-from-Motion.
+- 2020.03.04
+  - Using sparse matrix in Lagrange rotation averaging estimator. The efficiency for both row-by-row SDP solver and rank-deficient solver are highly improved. Rank-deficient solver is the fastest among current existing rotation averaging solver. (the solver is not public now.)
+
+- 2020.01.15
+  - Distributed implementation for Structure-from-Motion, which 
+    only relies on `rpclib` for Remote Procedure Call(RPC). The distributed
+    implementation follows the Map-Reduce architecture.
+
+- 2020.01.10
+  - Using Spectra for solving large scale eigenvalue problem in spectral 
+    clustering. The efficiency is highly improved than original eigenvalue
+    solver in Eigen.
 
 - 2019.11.26
-    - Image Clustering algorithms: NCut, Spectral Clustering (Updated in latest version).
-    - Graph-based sub-reconstruction Merging algorithm.
-
-
-## Licence
-
-```
-BSD 3-Clause License
-
-Copyright (c) 2018, 陈煜
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-* Neither the name of the copyright holder nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-```
+  - Normalized Cut for image clustering.
+  - Spectral Clustering for image clustering.
+  - Community detection for image clustering.
+  - Graph-based sub-reconstruction Merging algorithm.
+  - Fast view graph filtering algorithm.
+  - Rotation averaging algorithms: Nonlinear RA, Lagrange Dual RA.
+  - translation averaging algorithms: LUD (Not available currently).

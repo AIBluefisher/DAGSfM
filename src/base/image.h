@@ -32,26 +32,25 @@
 #ifndef COLMAP_SRC_BASE_IMAGE_H_
 #define COLMAP_SRC_BASE_IMAGE_H_
 
+#include <Eigen/Core>
+#include <map>
+#include <rpc/msgpack.hpp>
 #include <string>
 #include <vector>
-#include <map>
-
-#include <Eigen/Core>
 
 #include "base/camera.h"
 #include "base/point2d.h"
 #include "base/visibility_pyramid.h"
+#include "map_reduce/msgpack_adaptor.h"
 #include "util/alignment.h"
 #include "util/logging.h"
 #include "util/math.h"
 #include "util/types.h"
-#include "map_reduce/msgpack_adaptor.h"
-
-#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
-const size_t kMaxNumImages = static_cast<size_t>(std::numeric_limits<int32_t>::max());
+const size_t kMaxNumImages =
+    static_cast<size_t>(std::numeric_limits<int32_t>::max());
 
 // Class that holds information about an image. An image is the product of one
 // camera shot at a certain location (parameterized as the pose). An image may
@@ -97,6 +96,7 @@ class Image {
   // Get the number of triangulations, i.e. the number of points that
   // are part of a 3D point track.
   inline point2D_t NumPoints3D() const;
+  inline std::vector<point3D_t> ObservedPoints3D() const;
 
   // Get the number of observations, i.e. the number of image points that
   // have at least one correspondence to another image.
@@ -161,7 +161,7 @@ class Image {
   inline std::map<int, int>& VisibleTracks();
   void SetPoints2D(const std::vector<Eigen::Vector2d>& points);
   void SetPoints2D(const std::vector<class Point2D>& points);
-  
+
   // Access the colors of image points
   inline std::vector<Eigen::Vector3ub>& Colors2D();
 
@@ -219,31 +219,17 @@ class Image {
   // The default cluster id that images belong to.
   static const size_t kDefaultClusterId;
 
-  MSGPACK_DEFINE(image_id_, 
-                 cluster_id_, 
-                 name_, 
-                 camera_id_, 
-                 registered_, 
-                 num_points3D_,
-                 num_points3D_,
-                 num_observations_,
-                 num_correspondences_,
-                 num_visible_points3D_,
-                 angle_axis_,
-                 qvec_,
-                 tvec_,
-                 qvec_prior_,
-                 tvec_prior_,
-                 points2D_,
-                 colors2D_,
-                 visible_tracks_,
+  MSGPACK_DEFINE(image_id_, cluster_id_, name_, camera_id_, registered_,
+                 num_points3D_, num_observations_, num_correspondences_,
+                 num_visible_points3D_, angle_axis_, qvec_, tvec_, qvec_prior_,
+                 tvec_prior_, points2D_, colors2D_, visible_tracks_,
                  num_correspondences_have_point3D_);
 
  private:
   // Identifier of the image, if not specified `kInvalidImageId`.
   image_t image_id_;
 
-  // Identifier of the cluster that the current image belongs to, 
+  // Identifier of the cluster that the current image belongs to,
   // if not specified 'kDefaultClusterId'
   size_t cluster_id_;
 
@@ -322,24 +308,18 @@ inline void Image::SetCameraId(const camera_t camera_id) {
   camera_id_ = camera_id;
 }
 
-inline Eigen::Vector3d& Image::AngleAxis(){
-    return angle_axis_;
-}
+inline Eigen::Vector3d& Image::AngleAxis() { return angle_axis_; }
 
-inline std::vector<Eigen::Vector3ub>& Image::Colors2D() {
-    return colors2D_;
-}
+inline std::vector<Eigen::Vector3ub>& Image::Colors2D() { return colors2D_; }
 
-inline std::map<int, int>& Image::VisibleTracks() {
-    return visible_tracks_;
-}
+inline std::map<int, int>& Image::VisibleTracks() { return visible_tracks_; }
 
 inline std::map<int, int>& Image::MutableVisibleTracks() {
-    return visible_tracks_;
+  return visible_tracks_;
 }
 
 inline VisibilityPyramid& Image::MutableVisibilityPyramid() {
-    return point3D_visibility_pyramid_;
+  return point3D_visibility_pyramid_;
 }
 
 inline bool Image::HasCamera() const { return camera_id_ != kInvalidCameraId; }
@@ -353,6 +333,19 @@ point2D_t Image::NumPoints2D() const {
 }
 
 point2D_t Image::NumPoints3D() const { return num_points3D_; }
+
+inline std::vector<point3D_t> Image::ObservedPoints3D() const {
+  std::vector<point3D_t> points3D;
+  points3D.reserve(points2D_.size());
+
+  for (auto point2D : points2D_) {
+    if (point2D.HasPoint3D()) {
+      points3D.push_back(point2D.Point3DId());
+    }
+  }
+  points3D.shrink_to_fit();
+  return points3D;
+}
 
 point2D_t Image::NumObservations() const { return num_observations_; }
 

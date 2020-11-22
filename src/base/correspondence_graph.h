@@ -32,13 +32,12 @@
 #ifndef COLMAP_SRC_BASE_CORRESPONDENCE_GRAPH_H_
 #define COLMAP_SRC_BASE_CORRESPONDENCE_GRAPH_H_
 
+#include <rpc/msgpack.hpp>
 #include <unordered_map>
 #include <vector>
 
 #include "base/database.h"
 #include "util/types.h"
-
-#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -134,7 +133,7 @@ class CorrespondenceGraph {
   // observation as its only correspondence.
   bool IsTwoViewObservation(const image_t image_id,
                             const point2D_t point2D_idx) const;
-  
+
   MSGPACK_DEFINE(images_, image_pairs_);
 
  private:

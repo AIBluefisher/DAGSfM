@@ -1,7 +1,6 @@
 set(FOLDER_NAME "math")
 
 COLMAP_ADD_SOURCES(
-    # eigen_alias_definition.h
     distribution.h
     gauss_jordan.h
     linear_operator.h

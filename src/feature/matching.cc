@@ -401,6 +401,9 @@ void SiftGPUFeatureMatcher::Run() {
       GetDescriptorData(0, data.image_id1, &descriptors1_ptr);
       const FeatureDescriptors* descriptors2_ptr;
       GetDescriptorData(1, data.image_id2, &descriptors2_ptr);
+
+      LOG(INFO) << "Matching image pairs: " << data.image_id1 << ", "
+                << data.image_id2;
       MatchSiftFeaturesGPU(options_, descriptors1_ptr, descriptors2_ptr,
                            &sift_match_gpu, &data.matches);
 

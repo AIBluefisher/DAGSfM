@@ -30,9 +30,9 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/reconstruction_manager"
-#include "util/testing.h"
-
 #include "base/reconstruction_manager.h"
+
+#include "util/testing.h"
 
 using namespace colmap;
 

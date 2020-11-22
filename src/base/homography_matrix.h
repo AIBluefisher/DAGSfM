@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_BASE_HOMOGRAPHY_MATRIX_UTILS_H_
 #define COLMAP_SRC_BASE_HOMOGRAPHY_MATRIX_UTILS_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 #include "util/alignment.h"
 #include "util/types.h"

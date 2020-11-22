@@ -31,6 +31,10 @@
 
 #include "controllers/incremental_mapper_controller.h"
 
+#include "base/camera_models.h"
+#include "base/database_info.h"
+#include "base/image_reader.h"
+#include "feature/matching.h"
 #include "util/misc.h"
 
 namespace colmap {
@@ -154,6 +158,24 @@ void WriteSnapshot(const Reconstruction& reconstruction,
   CreateDirIfNotExists(path);
   std::cout << "  => Writing to " << path << std::endl;
   reconstruction.Write(path);
+}
+
+bool VerifyCameraParams(const std::string& camera_model,
+                        const std::string& params) {
+  if (!ExistsCameraModelWithName(camera_model)) {
+    std::cerr << "ERROR: Camera model does not exist" << std::endl;
+    return false;
+  }
+
+  const std::vector<double> camera_params = CSVToVector<double>(params);
+  const int camera_model_id = CameraModelNameToId(camera_model);
+
+  if (camera_params.size() > 0 &&
+      !CameraModelVerifyParams(camera_model_id, camera_params)) {
+    std::cerr << "ERROR: Invalid camera parameters" << std::endl;
+    return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -298,53 +320,152 @@ IncrementalMapperController::IncrementalMapperController(
       image_path_(image_path),
       database_path_(database_path),
       reconstruction_manager_(reconstruction_manager) {
-    CHECK(options_->Check());
-    RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
-    RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
-    RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+  CHECK(options_->Check());
+  RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
+  RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
+  RegisterCallback(LAST_IMAGE_REG_CALLBACK);
 }
 
-IncrementalMapperController::IncrementalMapperController(const IncrementalMapperOptions* options,
-                                                         ReconstructionManager* reconstruction_manager)
+IncrementalMapperController::IncrementalMapperController(
+    const IncrementalMapperOptions* options,
+    ReconstructionManager* reconstruction_manager)
     : options_(options),
       database_cache_(nullptr),
-      reconstruction_manager_(reconstruction_manager)
-{
-    CHECK(options_->Check());
-    RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
-    RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
-    RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+      reconstruction_manager_(reconstruction_manager) {
+  CHECK(options_->Check());
+  RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
+  RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
+  RegisterCallback(LAST_IMAGE_REG_CALLBACK);
 
-    server_.bind("GetLocalRecons", [this]() {
-        // std::vector<Reconstruction> reconstructions;
+  server_.bind("GetLocalRecons", [this]() {
+    // std::vector<Reconstruction> reconstructions;
 
-        // const size_t n = reconstruction_manager_->Size();
-        // for (size_t i = 0; i < n; i++) {
-        //     reconstructions.push_back(reconstruction_manager_->Get(i));
-        // }
+    // const size_t n = reconstruction_manager_->Size();
+    // for (size_t i = 0; i < n; i++) {
+    //     reconstructions.push_back(reconstruction_manager_->Get(i));
+    // }
 
-        // return reconstructions;
-        reconstruction_manager_->Get(0).ShowReconInfo();
-        return reconstruction_manager_->Get(0);
-    });
+    // return reconstructions;
+    reconstruction_manager_->Get(0).ShowReconInfo();
+    return reconstruction_manager_->Get(0);
+  });
+
+  // server_.bind("ResetWorkerInfo", [this]() {
+  //   LOG(INFO) << "reset worker info";
+  //     info_.Reset();
+  //   LOG(INFO) << "End reset worker info";
+  // });
+
+  server_.bind("GetLocalDatabaseInfo", [&, this]() {
+    LOG(INFO) << "Loading database";
+    DatabaseInfo database_info;
+    database_info.LoadDatabase(database_path_);
+    LOG(INFO) << "End loading database";
+    return database_info;
+  });
 }
 
-void IncrementalMapperController::SetDatabaseCache(DatabaseCache* database_cache)
-{
-    // Ensure previous database_cache is correctly released.
+IncrementalMapperController::~IncrementalMapperController() {
+  if (database_cache_.get() != nullptr) {
     database_cache_.release();
-    // Re-pointing to another database_cache.
-    database_cache_.reset(database_cache);
+  }
 }
 
-void IncrementalMapperController::SetReconManager(ReconstructionManager* recon_manager)
-{
-    reconstruction_manager_ = recon_manager;
+void IncrementalMapperController::SetDatabaseCache(
+    DatabaseCache* database_cache) {
+  // Ensure previous database_cache is correctly released.
+  database_cache_.release();
+  // Re-pointing to another database_cache.
+  database_cache_.reset(database_cache);
 }
 
-void IncrementalMapperController::RunSfM()
-{
-    Run();
+void IncrementalMapperController::SetReconManager(
+    ReconstructionManager* recon_manager) {
+  reconstruction_manager_ = recon_manager;
+}
+
+void IncrementalMapperController::SetImagePath(const std::string& image_path) {
+  image_path_ = image_path;
+}
+
+void IncrementalMapperController::SetDatabasePath(
+    const std::string& database_path) {
+  database_path_ = JoinPaths(database_path, "database.db");
+}
+
+void IncrementalMapperController::SetImageList(
+    const std::vector<std::string>& image_list) {
+  image_list_ = image_list;
+}
+
+void IncrementalMapperController::SetImagePairs(
+    const std::vector<std::pair<std::string, std::string>>& image_pairs) {
+  image_pairs_ = image_pairs;
+}
+
+void IncrementalMapperController::RunSfM() { Run(); }
+
+void IncrementalMapperController::ExtractFeatureAndMatch() {
+  info_.total_matching_pairs = image_pairs_.size();
+  info_.in_progress = true;
+  info_.idle = false;
+
+  LOG(INFO) << "Extracting Features";
+  ExtractFeature();
+
+  LOG(INFO) << "Feature Matching";
+  Match();
+
+  info_.completed = true;
+}
+
+void IncrementalMapperController::ExtractFeature() {
+  ImageReaderOptions reader_options;
+  reader_options.database_path = database_path_;
+  reader_options.image_path = image_path_;
+
+  if (!image_list_.empty()) {
+    reader_options.image_list = image_list_;
+  }
+
+  if (!ExistsCameraModelWithName(reader_options.camera_model)) {
+    std::cerr << "ERROR: Camera model does not exist" << std::endl;
+  }
+
+  if (!VerifyCameraParams(reader_options.camera_model,
+                          reader_options.camera_params)) {
+    return;
+  }
+  LOG(INFO) << "Image path: " << reader_options.image_path;
+  LOG(INFO) << "Database path: " << reader_options.database_path;
+  SiftExtractionOptions sift_extraction;
+  SiftFeatureExtractor feature_extractor(reader_options, sift_extraction);
+
+  feature_extractor.Start();
+  feature_extractor.Wait();
+}
+
+void IncrementalMapperController::Match() {
+  SiftMatchingOptions options;
+  Database database(database_path_);
+  FeatureMatcherCache cache(5 * image_list_.size(), &database);
+
+  const std::vector<Image> images = database.ReadAllImages();
+  std::unordered_map<std::string, image_t> image_name_to_id;
+  for (const auto image : images) {
+    image_name_to_id[image.Name()] = image.ImageId();
+  }
+
+  std::vector<std::pair<image_t, image_t>> image_id_pairs;
+  for (const auto image_pair : image_pairs_) {
+    image_id_pairs.emplace_back(image_name_to_id[image_pair.first],
+                                image_name_to_id[image_pair.second]);
+  }
+
+  SiftFeatureMatcher sift_feature_matcher(options, &database, &cache);
+  sift_feature_matcher.Setup();
+  cache.Setup();
+  sift_feature_matcher.Match(image_id_pairs);
 }
 
 void IncrementalMapperController::Run() {
@@ -361,8 +482,8 @@ void IncrementalMapperController::Run() {
     if (!LoadDatabase()) {
       return;
     }
-  } // else database_cache_ has been loaded.
-  
+  }  // else database_cache_ has been loaded.
+
   // Update local sfm running status.
   info_.total_image_num = database_cache_->NumImages();
 
@@ -403,7 +524,7 @@ bool IncrementalMapperController::LoadDatabase() {
   PrintHeading1("Loading database");
 
   // Make sure images of the given reconstruction are also included when
-  // manually specifying images for the reconstrunstruction procedure.
+  // manually specifying images for the reconstruction procedure.
   std::unordered_set<std::string> image_names = options_->image_names;
   if (reconstruction_manager_->Size() == 1 && !options_->image_names.empty()) {
     const Reconstruction& reconstruction = reconstruction_manager_->Get(0);
@@ -418,7 +539,7 @@ bool IncrementalMapperController::LoadDatabase() {
   timer.Start();
   const size_t min_num_matches = static_cast<size_t>(options_->min_num_matches);
   database_cache_->Load(database, min_num_matches, options_->ignore_watermarks,
-                       image_names);
+                        image_names);
   std::cout << std::endl;
   timer.PrintMinutes();
 
@@ -451,7 +572,8 @@ void IncrementalMapperController::Reconstruct(
                                                   "single reconstruction, but "
                                                   "multiple are given.";
 
-  for (int num_trials = 0; num_trials < options_->init_num_trials; ++num_trials) {
+  for (int num_trials = 0; num_trials < options_->init_num_trials;
+       ++num_trials) {
     BlockIfPaused();
     if (IsStopped()) {
       break;

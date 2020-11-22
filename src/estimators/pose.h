@@ -32,11 +32,10 @@
 #ifndef COLMAP_SRC_ESTIMATORS_POSE_H_
 #define COLMAP_SRC_ESTIMATORS_POSE_H_
 
-#include <vector>
+#include <ceres/ceres.h>
 
 #include <Eigen/Core>
-
-#include <ceres/ceres.h>
+#include <vector>
 
 #include "base/camera.h"
 #include "base/camera_models.h"

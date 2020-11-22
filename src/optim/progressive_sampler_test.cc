@@ -30,11 +30,11 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "optim/progressive_sampler"
-#include "util/testing.h"
+#include "optim/progressive_sampler.h"
 
 #include <unordered_set>
 
-#include "optim/progressive_sampler.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

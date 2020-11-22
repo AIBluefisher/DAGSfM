@@ -1,22 +1,86 @@
+// Copyright (C) 2014 The Regents of the University of California (Regents).
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//
+//     * Redistributions in binary form must reproduce the above
+//       copyright notice, this list of conditions and the following
+//       disclaimer in the documentation and/or other materials provided
+//       with the distribution.
+//
+//     * Neither the name of The Regents or University of California nor the
+//       names of its contributors may be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// Please contact the author of this library if you have any questions.
+// Author: Chris Sweeney (cmsweeney@cs.ucsb.edu)
+
+// BSD 3-Clause License
+
+// Copyright (c) 2020, Chenyu
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// 1. Redistributions of source code must retain the above copyright notice,
+// this
+//    list of conditions and the following disclaimer.
+
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #include "solver/constrained_l1_solver.h"
+
+#include <glog/logging.h>
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
-#include <glog/logging.h>
-
 #include <algorithm>
 #include <string>
 
 #include "math/sparse_cholesky_llt.h"
 #include "util/stringprintf.h"
 
-namespace GraphSfM {
+namespace DAGSfM {
 
 ConstrainedL1Solver::ConstrainedL1Solver(
-    const Options& options,
-    const Eigen::SparseMatrix<double>& A,
-    const Eigen::VectorXd& b,
-    const Eigen::SparseMatrix<double>& geq_mat,
+    const Options& options, const Eigen::SparseMatrix<double>& A,
+    const Eigen::VectorXd& b, const Eigen::SparseMatrix<double>& geq_mat,
     const Eigen::VectorXd& geq_vec)
     : options_(options),
       num_l1_residuals_(b.size()),
@@ -121,13 +185,13 @@ void ConstrainedL1Solver::Solve(Eigen::VectorXd* solution) {
     const double max_norm = std::max({a_times_x.norm(), z.norm(), rhs_norm});
     const double primal_eps =
         primal_abs_tolerance_eps + options_.relative_tolerance * max_norm;
-    const double dual_eps = dual_abs_tolerance_eps +
-                            options_.relative_tolerance *
-                                (options_.rho * A_.transpose() * u).norm();
+    const double dual_eps =
+        dual_abs_tolerance_eps + options_.relative_tolerance *
+                                     (options_.rho * A_.transpose() * u).norm();
 
     // Log the result to the screen.
-    VLOG(2) << GraphSfM::StringPrintf(
-        row_format.c_str(), i, r_norm, s_norm, primal_eps, dual_eps);
+    VLOG(2) << DAGSfM::StringPrintf(row_format.c_str(), i, r_norm, s_norm,
+                                    primal_eps, dual_eps);
     // Determine if the minimizer has converged.
     if (r_norm < primal_eps && s_norm < dual_eps) {
       break;
@@ -152,4 +216,4 @@ Eigen::VectorXd ConstrainedL1Solver::ModifiedShrinkage(
   return output;
 }
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM

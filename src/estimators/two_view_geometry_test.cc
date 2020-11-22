@@ -30,10 +30,10 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "estimators/two_view_geometry"
-#include "util/testing.h"
+#include "estimators/two_view_geometry.h"
 
 #include "base/pose.h"
-#include "estimators/two_view_geometry.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

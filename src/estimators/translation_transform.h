@@ -32,10 +32,9 @@
 #ifndef COLMAP_SRC_BASE_SIMILARITY_TRANSFORM_H_
 #define COLMAP_SRC_BASE_SIMILARITY_TRANSFORM_H_
 
-#include <vector>
-
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <vector>
 
 #include "util/alignment.h"
 #include "util/logging.h"

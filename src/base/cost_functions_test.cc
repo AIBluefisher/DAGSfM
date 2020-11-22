@@ -30,11 +30,11 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/cost_functions"
-#include "util/testing.h"
+#include "base/cost_functions.h"
 
 #include "base/camera_models.h"
-#include "base/cost_functions.h"
 #include "base/pose.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

@@ -32,13 +32,12 @@
 #ifndef COLMAP_SRC_BASE_TRACK_H_
 #define COLMAP_SRC_BASE_TRACK_H_
 
+#include <rpc/msgpack.hpp>
 #include <vector>
 
+#include "map_reduce/msgpack_adaptor.h"
 #include "util/logging.h"
 #include "util/types.h"
-#include "map_reduce/msgpack_adaptor.h"
-
-#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -86,7 +85,7 @@ class Track {
 
   // Shrink the capacity of track vector to fit its size to save memory.
   inline void Compress();
-  
+
   MSGPACK_DEFINE(elements_);
 
  private:

@@ -30,9 +30,9 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "estimators/fundamental_matrix"
-#include "util/testing.h"
-
 #include "estimators/fundamental_matrix.h"
+
+#include "util/testing.h"
 
 using namespace colmap;
 

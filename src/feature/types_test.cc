@@ -30,12 +30,12 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "feature/types"
-#include "util/testing.h"
+#include "feature/types.h"
 
 #include <unordered_set>
 
-#include "feature/types.h"
 #include "util/math.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

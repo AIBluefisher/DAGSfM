@@ -80,18 +80,6 @@ AutomaticReconstructionWidget::AutomaticReconstructionWidget(
 
   AddOptionBool(&options_.single_camera, "Shared intrinsics");
   AddOptionBool(&options_.sparse, "Sparse model");
-  AddOptionBool(&options_.dense, "Dense model");
-
-  QLabel* mesher_label = new QLabel(tr("Mesher"), this);
-  mesher_label->setFont(font());
-  mesher_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  grid_layout_->addWidget(mesher_label, grid_layout_->rowCount(), 0);
-
-  mesher_cb_ = new QComboBox(this);
-  mesher_cb_->addItem("Poisson");
-  mesher_cb_->addItem("Delaunay");
-  mesher_cb_->setCurrentIndex(0);
-  grid_layout_->addWidget(mesher_cb_, grid_layout_->rowCount() - 1, 1);
 
   AddSpacer();
 
@@ -160,18 +148,6 @@ void AutomaticReconstructionWidget::Run() {
       break;
   }
 
-  switch (mesher_cb_->currentIndex()) {
-    case 0:
-      options_.mesher = AutomaticReconstructionController::Mesher::POISSON;
-      break;
-    case 1:
-      options_.mesher = AutomaticReconstructionController::Mesher::DELAUNAY;
-      break;
-    default:
-      options_.mesher = AutomaticReconstructionController::Mesher::POISSON;
-      break;
-  }
-
   main_window_->reconstruction_manager_.Clear();
   main_window_->reconstruction_manager_widget_->Update();
   main_window_->RenderClear();
@@ -200,15 +176,6 @@ void AutomaticReconstructionWidget::RenderResult() {
         tr("Imported the reconstructed sparse models for visualization. The "
            "models were also exported to the <i>sparse</i> sub-folder in the "
            "workspace."));
-  }
-
-  if (options_.dense) {
-    QMessageBox::information(
-        this, "",
-        tr("To visualize the reconstructed dense point cloud, navigate to the "
-           "<i>dense</i> sub-folder in your workspace with <i>File > Import "
-           "model from...</i>. To visualize the meshed model, you must use an "
-           "external viewer such as Meshlab."));
   }
 }
 

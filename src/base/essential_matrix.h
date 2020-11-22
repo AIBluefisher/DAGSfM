@@ -32,11 +32,10 @@
 #ifndef COLMAP_SRC_BASE_ESSENTIAL_MATRIX_H_
 #define COLMAP_SRC_BASE_ESSENTIAL_MATRIX_H_
 
-#include <vector>
+#include <ceres/ceres.h>
 
 #include <Eigen/Core>
-
-#include <ceres/ceres.h>
+#include <vector>
 
 #include "util/alignment.h"
 #include "util/types.h"

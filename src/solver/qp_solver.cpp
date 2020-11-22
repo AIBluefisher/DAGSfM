@@ -1,8 +1,74 @@
+// Copyright (C) 2014 The Regents of the University of California (Regents).
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//
+//     * Redistributions in binary form must reproduce the above
+//       copyright notice, this list of conditions and the following
+//       disclaimer in the documentation and/or other materials provided
+//       with the distribution.
+//
+//     * Neither the name of The Regents or University of California nor the
+//       names of its contributors may be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// Please contact the author of this library if you have any questions.
+// Author: Chris Sweeney (cmsweeney@cs.ucsb.edu)
+
+// BSD 3-Clause License
+
+// Copyright (c) 2020, Chenyu
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// 1. Redistributions of source code must retain the above copyright notice,
+// this
+//    list of conditions and the following disclaimer.
+
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #include "solver/qp_solver.h"
 
-#include <Eigen/Core>
 #include <glog/logging.h>
 
+#include <Eigen/Core>
 #include <algorithm>
 #include <limits>
 #include <string>
@@ -10,12 +76,10 @@
 #include "math/sparse_cholesky_llt.h"
 #include "util/stringprintf.h"
 
-namespace GraphSfM {
+namespace DAGSfM {
 
-QPSolver::QPSolver(const Options& options,
-                   const Eigen::SparseMatrix<double>& P,
-                   const Eigen::VectorXd& q,
-                   const double r)
+QPSolver::QPSolver(const Options& options, const Eigen::SparseMatrix<double>& P,
+                   const Eigen::VectorXd& q, const double r)
     : options_(options), P_(P), q_(q), r_(r) {
   CHECK_EQ(P_.rows(), P_.cols()) << "P must be a symmetric matrix.";
   CHECK_EQ(P_.cols(), q_.size())
@@ -52,9 +116,10 @@ bool QPSolver::Solve(Eigen::VectorXd* solution) {
   int coeff_index = -1;
   if ((ub_ - lb_).minCoeff(&coeff_index) < 0) {
     LOG(WARNING) << "You specified invalid lower or upper bounds for the "
-                    "problem. lower_bound[" << coeff_index
-                 << "] = " << lb_[coeff_index] << " but upper_bound["
-                 << coeff_index << "] = " << ub_[coeff_index];
+                    "problem. lower_bound["
+                 << coeff_index << "] = " << lb_[coeff_index]
+                 << " but upper_bound[" << coeff_index
+                 << "] = " << ub_[coeff_index];
     return false;
   }
 
@@ -116,4 +181,4 @@ bool QPSolver::Solve(Eigen::VectorXd* solution) {
   return true;
 }
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM

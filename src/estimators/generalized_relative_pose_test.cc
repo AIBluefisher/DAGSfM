@@ -30,16 +30,16 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/generalized_relative_pose"
-#include "util/testing.h"
+#include "estimators/generalized_relative_pose.h"
 
 #include <array>
 
 #include "base/pose.h"
 #include "base/projection.h"
 #include "base/similarity_transform.h"
-#include "estimators/generalized_relative_pose.h"
 #include "optim/loransac.h"
 #include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

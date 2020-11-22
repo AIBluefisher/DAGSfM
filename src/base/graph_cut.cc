@@ -31,11 +31,10 @@
 
 #include "base/graph_cut.h"
 
-#include <unordered_map>
-
 #include <boost/graph/stoer_wagner_min_cut.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <boost/typeof/typeof.hpp>
+#include <unordered_map>
 
 extern "C" {
 #include "Graclus/metisLib/metis.h"

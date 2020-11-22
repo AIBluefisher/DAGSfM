@@ -32,6 +32,14 @@
 #ifndef COLMAP_SRC_UTIL_TYPES_H_
 #define COLMAP_SRC_UTIL_TYPES_H_
 
+#include <stdint.h>
+
+#include <Eigen/Core>
+#include <cstdint>
+#include <limits>
+#include <tuple>
+#include <utility>
+
 #include "util/alignment.h"
 
 #ifdef _MSC_VER
@@ -91,6 +99,13 @@ typedef uint32_t point2D_t;
 // delete them, and possibly re-add them again, the maximum number of allowed
 // unique indices should be large.
 typedef uint64_t point3D_t;
+
+// Unique identifier for each set of tracks.
+typedef uint64_t track_t;
+
+typedef std::pair<image_t, image_t> ImagePair;
+typedef std::pair<std::string, std::string> ImageNamePair;
+typedef std::tuple<image_t, image_t, image_t> ImageIdTriplet;
 
 // Values for invalid identifiers or indices.
 const camera_t kInvalidCameraId = std::numeric_limits<camera_t>::max();

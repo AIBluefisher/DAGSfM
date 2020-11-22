@@ -32,11 +32,10 @@
 #ifndef COLMAP_SRC_BASE_CAMERA_H_
 #define COLMAP_SRC_BASE_CAMERA_H_
 
+#include <rpc/msgpack.hpp>
 #include <vector>
 
 #include "util/types.h"
-
-#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -144,14 +143,10 @@ class Camera {
   // and the principal point.
   void Rescale(const double scale);
   void Rescale(const size_t width, const size_t height);
-  
-  MSGPACK_DEFINE(camera_id_, 
-                 model_id_, 
-                 width_, 
-                 height_, 
-                 params_, 
-                 prior_focal_length_, 
-                 prior_focal_length_);
+
+  MSGPACK_DEFINE(camera_id_, model_id_, width_, height_, params_,
+                 prior_focal_length_, prior_focal_length_);
+
  private:
   // The unique identifier of the camera. If the identifier is not specified
   // it is set to `kInvalidCameraId`.
@@ -203,9 +198,7 @@ void Camera::SetPriorFocalLength(const double prior) {
   prior_focal_length = prior;
 }
 
-double Camera::GetPriorFocalLength() {
-  return prior_focal_length;
-}
+double Camera::GetPriorFocalLength() { return prior_focal_length; }
 
 size_t Camera::NumParams() const { return params_.size(); }
 

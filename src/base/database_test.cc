@@ -30,11 +30,11 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/database"
-#include "util/testing.h"
+#include "base/database.h"
 
 #include <thread>
 
-#include "base/database.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

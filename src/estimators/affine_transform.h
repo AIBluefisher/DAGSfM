@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_ESTIMATORS_AFFINE_TRANSFORM_H_
 #define COLMAP_SRC_ESTIMATORS_AFFINE_TRANSFORM_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 #include "util/alignment.h"
 #include "util/types.h"

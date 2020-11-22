@@ -1,2 +1,4 @@
 paper
 build
+.vscode/
+lib/mirror/data/model/model.*

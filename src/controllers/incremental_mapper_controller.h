@@ -32,12 +32,14 @@
 #ifndef COLMAP_SRC_CONTROLLERS_INCREMENTAL_MAPPER_H_
 #define COLMAP_SRC_CONTROLLERS_INCREMENTAL_MAPPER_H_
 
+#include "base/database_info.h"
 #include "base/reconstruction_manager.h"
+#include "feature/extraction.h"
+#include "map_reduce/worker.h"
 #include "sfm/incremental_mapper.h"
 #include "util/threading.h"
-#include "map_reduce/worker.h"
 
-using namespace GraphSfM;
+using namespace DAGSfM;
 
 namespace colmap {
 
@@ -164,26 +166,50 @@ class IncrementalMapperController : public Thread, public SfMWorker {
                               const std::string& image_path,
                               const std::string& database_path,
                               ReconstructionManager* reconstruction_manager);
-  
+
   IncrementalMapperController(const IncrementalMapperOptions* options,
                               ReconstructionManager* reconstruction_manager);
+
+  ~IncrementalMapperController();
 
   void SetDatabaseCache(DatabaseCache* database_cache);
 
   void SetReconManager(ReconstructionManager* recon_manager);
 
+  void SetImagePath(const std::string& image_path);
+
+  void SetDatabasePath(const std::string& database_path);
+  // void SetDatabaseInfo(const DatabaseInfo& database_info);
+
+  void SetImageList(const std::vector<std::string>& image_list);
+  void SetImagePairs(const std::vector<ImageNamePair>& image_pairs);
+
+  // void SetGlobalImageNameToId(
+  //     const std::unordered_map<std::string, image_t>& image_name_to_id);
+
   void RunSfM();
+
+  void ExtractFeatureAndMatch();
 
  private:
   void Run();
   bool LoadDatabase();
+  void ExtractFeature();
+  void Match();
   void Reconstruct(const IncrementalMapper::Options& init_mapper_options);
 
   const IncrementalMapperOptions* options_;
-  const std::string image_path_;
-  const std::string database_path_;
-  ReconstructionManager* reconstruction_manager_;
+  std::string image_path_;
+  std::string database_path_;
+
+  std::vector<std::string> image_list_;
+  std::vector<ImageNamePair> image_pairs_;
+  // std::unordered_map<std::string, image_t> global_image_name_to_id_;
+  // DatabaseInfo database_info_;
+
   std::unique_ptr<DatabaseCache> database_cache_;
+
+  ReconstructionManager* reconstruction_manager_;
 };
 
 // Globally filter points and images in mapper.

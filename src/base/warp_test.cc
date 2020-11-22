@@ -30,10 +30,10 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/warp"
-#include "util/testing.h"
-
 #include "base/warp.h"
+
 #include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 namespace {

@@ -32,6 +32,7 @@
 #ifndef COLMAP_SRC_RETRIEVAL_INVERTED_FILE_H_
 #define COLMAP_SRC_RETRIEVAL_INVERTED_FILE_H_
 
+#include <Eigen/Core>
 #include <algorithm>
 #include <bitset>
 #include <cstdint>
@@ -39,8 +40,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <Eigen/Core>
 
 #include "retrieval/geometry.h"
 #include "retrieval/inverted_file_entry.h"

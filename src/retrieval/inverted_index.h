@@ -32,6 +32,8 @@
 #ifndef COLMAP_SRC_RETRIEVAL_INVERTED_INDEX_H_
 #define COLMAP_SRC_RETRIEVAL_INVERTED_INDEX_H_
 
+#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <algorithm>
 #include <bitset>
 #include <cstdint>
@@ -39,9 +41,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <Eigen/Core>
-#include <Eigen/Dense>
 
 #include "retrieval/inverted_file.h"
 #include "util/alignment.h"
@@ -224,8 +223,8 @@ void InvertedIndex<kDescType, kDescDim, kEmbeddingDim>::AddEntry(
   CHECK_EQ(descriptor.size(), kDescDim);
   const ProjDescType proj_desc =
       proj_matrix_ * descriptor.transpose().template cast<float>();
-  inverted_files_.at(word_id)
-      .AddEntry(image_id, feature_idx, proj_desc, geometry);
+  inverted_files_.at(word_id).AddEntry(image_id, feature_idx, proj_desc,
+                                       geometry);
 }
 
 template <typename kDescType, int kDescDim, int kEmbeddingDim>
@@ -288,14 +287,14 @@ void InvertedIndex<kDescType, kDescDim, kEmbeddingDim>::Query(
 }
 
 template <typename kDescType, int kDescDim, int kEmbeddingDim>
-void InvertedIndex<kDescType, kDescDim, kEmbeddingDim>::ConvertToBinaryDescriptor(
-    const int word_id,
-    const DescType& descriptor,
-    std::bitset<kEmbeddingDim>* binary_descriptor) const {
+void InvertedIndex<kDescType, kDescDim, kEmbeddingDim>::
+    ConvertToBinaryDescriptor(
+        const int word_id, const DescType& descriptor,
+        std::bitset<kEmbeddingDim>* binary_descriptor) const {
   const ProjDescType proj_desc =
       proj_matrix_ * descriptor.transpose().template cast<float>();
-  inverted_files_.at(word_id)
-      .ConvertToBinaryDescriptor(proj_desc, binary_descriptor);
+  inverted_files_.at(word_id).ConvertToBinaryDescriptor(proj_desc,
+                                                        binary_descriptor);
 }
 
 template <typename kDescType, int kDescDim, int kEmbeddingDim>

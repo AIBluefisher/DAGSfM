@@ -1,52 +1,59 @@
+#  BSD 3-Clause License
+
+#  Copyright (c) 2020, Chenyu
+#  All rights reserved.
+
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+
+#  1. Redistributions of source code must retain the above copyright notice,
+#  this
+#     list of conditions and the following disclaimer.
+
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 DATASET_PATH=$1
 num_images_ub=$2
 log_folder=$3
-# completeness_ratio=$4
-#VOC_TREE_PATH=$5
-# image_overlap=$3
-# max_num_cluster_pairs=$4
+CONFIG_FILE_PATH=$4
 
-
-/home/amax/Projects/colmap/build/src/exe/colmap feature_extractor \
---database_path=$DATASET_PATH/database.db \
---image_path=$DATASET_PATH/images \
---SiftExtraction.num_threads=8 \
---SiftExtraction.use_gpu=0 \
---SiftExtraction.gpu_index=-1
-
-/home/amax/Projects/colmap/build/src/exe/colmap exhaustive_matcher \
---database_path=$DATASET_PATH/database.db \
---SiftMatching.num_threads=8 \
---SiftMatching.use_gpu=0 \
---SiftMatching.gpu_index=-1
-## Or use vocabulary tree matcher
-# /home/amax/Projects/colmap/build/src/exe/colmap vocab_tree_matcher \
-# --database_path=$DATASET_PATH/database.db \
-# --SiftMatching.num_threads=8 \
-# --SiftMatching.use_gpu=1 \
-# --SiftMatching.gpu_index=0 \
-# --VocabTreeMatching.num_images=100 \
-# --VocabTreeMatching.num_nearest_neighbors=5 \
-# --VocabTreeMatching.vocab_tree_path=$VOC_TREE_PATH
-
-/home/amax/Projects/colmap/build/src/exe/colmap distributed_mapper \
+/home/chenyu/Projects/Disco/build/src/exe/colmap distributed_mapper \
 $DATASET_PATH/$log_folder \
 --database_path=$DATASET_PATH/database.db \
---transfer_images_to_server=0 \
 --image_path=$DATASET_PATH/images \
 --output_path=$DATASET_PATH/$log_folder \
+--config_file_name=$CONFIG_FILE_PATH/config.txt \
 --num_workers=8 \
 --distributed=0 \
---repartition=0 \
---assign_cluster_id=1 \
+--num_images=100 \
+--assign_cluster_id=0 \
 --write_binary=1 \
 --retriangulate=0 \
---final_ba=0 \
+--final_ba=1 \
 --select_tracks_for_bundle_adjustment=1 \
 --long_track_length_threshold=10 \
 --graph_dir=$DATASET_PATH/$log_folder \
 --num_images_ub=$num_images_ub \
 --completeness_ratio=0.7 \
 --relax_ratio=1.3 \
---cluster_type=NCUT # SPECTRA
+--cluster_type=SPECTRA #SPECTRA #NCUT COMMUNITY_DETECTION #
+# --max_num_cluster_pairs=$max_num_cluster_pairs \
 # --image_overlap=$image_overlap \

@@ -31,11 +31,10 @@
 
 #include "estimators/essential_matrix.h"
 
-#include <complex>
-
 #include <Eigen/Geometry>
 #include <Eigen/LU>
 #include <Eigen/SVD>
+#include <complex>
 
 #include "base/polynomial.h"
 #include "estimators/utils.h"

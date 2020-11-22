@@ -31,13 +31,12 @@
 
 #include "estimators/fundamental_matrix.h"
 
-#include <cfloat>
-#include <complex>
-#include <vector>
-
 #include <Eigen/Geometry>
 #include <Eigen/LU>
 #include <Eigen/SVD>
+#include <cfloat>
+#include <complex>
+#include <vector>
 
 #include "base/polynomial.h"
 #include "estimators/utils.h"

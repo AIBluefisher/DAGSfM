@@ -30,10 +30,10 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/undistortion"
-#include "util/testing.h"
+#include "base/undistortion.h"
 
 #include "base/pose.h"
-#include "base/undistortion.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

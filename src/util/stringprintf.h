@@ -4,7 +4,7 @@
 #include <cstdarg>
 #include <string>
 
-namespace GraphSfM {
+namespace DAGSfM {
 
 #if (defined(__GNUC__) || defined(__clang__))
 // Tell the compiler to do printf format string checking if the compiler
@@ -27,6 +27,6 @@ extern std::string StringPrintf(const char* format, ...)
     // Tell the compiler to do printf format string checking.
     GRAPHSFM_PRINTF_ATTRIBUTE(1, 2);
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM
 
 #endif  // GRAPHSFM_UTIL_STRINGPRINTF_H_

@@ -507,19 +507,25 @@ TwoViewGeometry Database::ReadTwoViewGeometry(const image_t image_id1,
   two_view_geometry.config = static_cast<int>(
       sqlite3_column_int64(sql_stmt_read_two_view_geometry_, 3));
 
-  two_view_geometry.F = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+  //   two_view_geometry.F = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+  //       sql_stmt_read_two_view_geometry_, rc, 4);
+  //   two_view_geometry.E = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+  //       sql_stmt_read_two_view_geometry_, rc, 5);
+  //   two_view_geometry.H = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+  //       sql_stmt_read_two_view_geometry_, rc, 6);
+  two_view_geometry.qvec = ReadStaticMatrixBlob<Eigen::Vector4d>(
       sql_stmt_read_two_view_geometry_, rc, 4);
-  two_view_geometry.E = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+  two_view_geometry.tvec = ReadStaticMatrixBlob<Eigen::Vector3d>(
       sql_stmt_read_two_view_geometry_, rc, 5);
-  two_view_geometry.H = ReadStaticMatrixBlob<Eigen::Matrix3d>(
-      sql_stmt_read_two_view_geometry_, rc, 6);
 
   SQLITE3_CALL(sqlite3_reset(sql_stmt_read_two_view_geometry_));
 
   two_view_geometry.inlier_matches = FeatureMatchesFromBlob(blob);
-  two_view_geometry.F.transposeInPlace();
-  two_view_geometry.E.transposeInPlace();
-  two_view_geometry.H.transposeInPlace();
+  //   two_view_geometry.F.transposeInPlace();
+  //   two_view_geometry.E.transposeInPlace();
+  //   two_view_geometry.H.transposeInPlace();
+  two_view_geometry.qvec.transposeInPlace();
+  two_view_geometry.tvec.transposeInPlace();
 
   if (SwapImagePair(image_id1, image_id2)) {
     two_view_geometry.Invert();
@@ -547,16 +553,22 @@ void Database::ReadTwoViewGeometries(
     two_view_geometry.config = static_cast<int>(
         sqlite3_column_int64(sql_stmt_read_two_view_geometries_, 4));
 
-    two_view_geometry.F = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+    // two_view_geometry.F = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+    // sql_stmt_read_two_view_geometries_, rc, 5);
+    // two_view_geometry.E = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+    // sql_stmt_read_two_view_geometries_, rc, 6);
+    // two_view_geometry.H = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+    // sql_stmt_read_two_view_geometries_, rc, 7);
+    two_view_geometry.qvec = ReadStaticMatrixBlob<Eigen::Vector4d>(
         sql_stmt_read_two_view_geometries_, rc, 5);
-    two_view_geometry.E = ReadStaticMatrixBlob<Eigen::Matrix3d>(
+    two_view_geometry.tvec = ReadStaticMatrixBlob<Eigen::Vector3d>(
         sql_stmt_read_two_view_geometries_, rc, 6);
-    two_view_geometry.H = ReadStaticMatrixBlob<Eigen::Matrix3d>(
-        sql_stmt_read_two_view_geometries_, rc, 7);
 
-    two_view_geometry.F.transposeInPlace();
-    two_view_geometry.E.transposeInPlace();
-    two_view_geometry.H.transposeInPlace();
+    // two_view_geometry.F.transposeInPlace();
+    // two_view_geometry.E.transposeInPlace();
+    // two_view_geometry.H.transposeInPlace();
+    two_view_geometry.qvec.transposeInPlace();
+    two_view_geometry.tvec.transposeInPlace();
 
     two_view_geometries->push_back(two_view_geometry);
   }
@@ -716,21 +728,27 @@ void Database::WriteTwoViewGeometry(
   // Transpose the matrices to obtain row-major data layout.
   // Important: Do not move these objects inside the if-statement, because
   // the objects must live until `sqlite3_step` is called on the statement.
-  const Eigen::Matrix3d Ft = two_view_geometry_ptr->F.transpose();
-  const Eigen::Matrix3d Et = two_view_geometry_ptr->E.transpose();
-  const Eigen::Matrix3d Ht = two_view_geometry_ptr->H.transpose();
+  //   const Eigen::Matrix3d Ft = two_view_geometry_ptr->F.transpose();
+  //   const Eigen::Matrix3d Et = two_view_geometry_ptr->E.transpose();
+  //   const Eigen::Matrix3d Ht = two_view_geometry_ptr->H.transpose();
+  const Eigen::Vector4d qt = two_view_geometry_ptr->qvec.transpose();
+  const Eigen::Vector3d tt = two_view_geometry_ptr->tvec.transpose();
 
   if (two_view_geometry_ptr->inlier_matches.size() > 0) {
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Ft, 6);
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Et, 7);
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Ht, 8);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Ft, 6);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Et, 7);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, Ht, 8);
+    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, qt, 6);
+    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, tt, 7);
   } else {
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
-                          Eigen::MatrixXd(0, 0), 6);
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
-                          Eigen::MatrixXd(0, 0), 7);
-    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
-                          Eigen::MatrixXd(0, 0), 8);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
+    //   Eigen::MatrixXd(0, 0), 6);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
+    //   Eigen::MatrixXd(0, 0), 7);
+    // WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_,
+    //   Eigen::MatrixXd(0, 0), 8);
+    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, qt, 6);
+    WriteStaticMatrixBlob(sql_stmt_write_two_view_geometry_, tt, 7);
   }
 
   SQLITE3_CALL(sqlite3_step(sql_stmt_write_two_view_geometry_));

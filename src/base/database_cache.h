@@ -32,12 +32,12 @@
 #ifndef COLMAP_SRC_BASE_DATABASE_CACHE_H_
 #define COLMAP_SRC_BASE_DATABASE_CACHE_H_
 
+#include <Eigen/Core>
+#include <rpc/msgpack.hpp>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include <Eigen/Core>
 
 #include "base/camera.h"
 #include "base/camera_models.h"
@@ -46,8 +46,6 @@
 #include "base/image.h"
 #include "util/alignment.h"
 #include "util/types.h"
-
-#include <rpc/msgpack.hpp>
 
 namespace colmap {
 
@@ -94,11 +92,11 @@ class DatabaseCache {
             const bool ignore_watermarks,
             const std::unordered_set<std::string>& image_names);
 
-//   void Copy(DatabaseCache& database_cache) const;
+  //   void Copy(DatabaseCache& database_cache) const;
 
   // Find specific image by name. Note that this uses linear search.
   const class Image* FindImageWithName(const std::string& name) const;
-  
+
   MSGPACK_DEFINE(correspondence_graph_, cameras_, images_);
 
  private:

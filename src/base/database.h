@@ -32,11 +32,10 @@
 #ifndef COLMAP_SRC_BASE_DATABASE_H_
 #define COLMAP_SRC_BASE_DATABASE_H_
 
+#include <Eigen/Core>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
-
-#include <Eigen/Core>
 
 #include "SQLite/sqlite3.h"
 #include "base/camera.h"
@@ -46,7 +45,6 @@
 #include "util/types.h"
 
 namespace colmap {
-
 // Database class to read and write images, features, cameras, matches, etc.
 // from a SQLite database. The class is not thread-safe and must not be accessed
 // concurrently. The class is optimized for single-thread speed and for optimal

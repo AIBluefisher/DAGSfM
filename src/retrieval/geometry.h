@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_RETRIEVAL_GEOMETRY_H_
 #define COLMAP_SRC_RETRIEVAL_GEOMETRY_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 namespace colmap {
 namespace retrieval {

@@ -1,22 +1,86 @@
+// Copyright (C) 2014 The Regents of the University of California (Regents).
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//
+//     * Redistributions in binary form must reproduce the above
+//       copyright notice, this list of conditions and the following
+//       disclaimer in the documentation and/or other materials provided
+//       with the distribution.
+//
+//     * Neither the name of The Regents or University of California nor the
+//       names of its contributors may be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// Please contact the author of this library if you have any questions.
+// Author: Chris Sweeney (cmsweeney@cs.ucsb.edu)
+
+// BSD 3-Clause License
+
+// Copyright (c) 2020, Chenyu
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// 1. Redistributions of source code must retain the above copyright notice,
+// this
+//    list of conditions and the following disclaimer.
+
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef GRAPHSFM_MATH_MATRIX_GAUSS_JORDAN_H_
 #define GRAPHSFM_MATH_MATRIX_GAUSS_JORDAN_H_
+
+#include <glog/logging.h>
 
 #include <Eigen/Core>
 #include <algorithm>
 #include <cmath>
-#include <glog/logging.h>
 
-namespace GraphSfM {
+namespace DAGSfM {
 namespace internal {
 
 // Finds the largest absolute value in column starting from a certain row.
 template <typename Derived>
 typename Derived::Scalar FindLargestAbsoluteValueInColumn(
-    const Eigen::MatrixBase<Derived>& matrix,
-    const int column,
-    const int starting_row,
-    const int ending_row,
-    int* max_value_index) {
+    const Eigen::MatrixBase<Derived>& matrix, const int column,
+    const int starting_row, const int ending_row, int* max_value_index) {
   using ScalarType = typename Derived::Scalar;
   ScalarType max_value = matrix(starting_row, column);
   *max_value_index = starting_row;
@@ -61,8 +125,8 @@ int TopDownGaussJordan(const int last_row, Eigen::MatrixBase<Derived>* input) {
   CHECK_GE(last_row, 1) << "last_row must be larger than or equal to 1.";
   CHECK_GE(CHECK_NOTNULL(input)->cols(), input->rows())
       << "Expected a sqaured or fat matrix.";
-  const int num_rows_to_process = std::min(
-      static_cast<int>(input->rows()), last_row + 1);
+  const int num_rows_to_process =
+      std::min(static_cast<int>(input->rows()), last_row + 1);
   const int last_row_to_process = num_rows_to_process - 1;
 
   // This for loop eliminates entries in the lower-left triangular part, and it
@@ -71,10 +135,9 @@ int TopDownGaussJordan(const int last_row, Eigen::MatrixBase<Derived>* input) {
     // Search for the maxium entry in column with current_row index.
     const int tail_size = num_rows_to_process - current_row;
     int max_coeff_row_idx = 0;
-    const ScalarType max_value =
-        FindLargestAbsoluteValueInColumn(
-            *input, current_row, current_row,
-            last_row_to_process, &max_coeff_row_idx);
+    const ScalarType max_value = FindLargestAbsoluteValueInColumn(
+        *input, current_row, current_row, last_row_to_process,
+        &max_coeff_row_idx);
 
     // Swap rows.
     input->row(current_row).swap(input->row(max_coeff_row_idx));
@@ -84,8 +147,8 @@ int TopDownGaussJordan(const int last_row, Eigen::MatrixBase<Derived>* input) {
     (*input)(current_row, current_row) = static_cast<ScalarType>(1.0);
 
     // Set the remaining entries of the column to zero.
-    for (int temp_row = current_row + 1;
-         temp_row < num_rows_to_process; ++temp_row) {
+    for (int temp_row = current_row + 1; temp_row < num_rows_to_process;
+         ++temp_row) {
       // If the number is too small, it is best to consider it as zero already.
       const ScalarType leading_coeff = (*input)(temp_row, current_row);
       if (std::abs(leading_coeff) < kPrecisionThreshold) {
@@ -112,14 +175,13 @@ int TopDownGaussJordan(const int last_row, Eigen::MatrixBase<Derived>* input) {
 //         |0 0 ... w |                           | 0 0 ... 0 |
 //         |0 0 ... 1 |                           | 0 0 ... 1 |
 template <typename Derived>
-void BottomUpGaussJordan(const int start_row,
-                         const int last_row_to_process,
+void BottomUpGaussJordan(const int start_row, const int last_row_to_process,
                          Eigen::MatrixBase<Derived>* input) {
   using ScalarType = typename Derived::Scalar;
   const ScalarType kPrecisionThreshold = static_cast<ScalarType>(1e-9);
-  const int min_dimension = std::min(
-      static_cast<int>(CHECK_NOTNULL(input)->rows()),
-      static_cast<int>(input->cols()));
+  const int min_dimension =
+      std::min(static_cast<int>(CHECK_NOTNULL(input)->rows()),
+               static_cast<int>(input->cols()));
   CHECK_GE(start_row, 0);
   CHECK_LE(start_row, min_dimension);
   CHECK_GE(last_row_to_process, 0);
@@ -132,8 +194,8 @@ void BottomUpGaussJordan(const int start_row,
 
   // This for loop eliminates entries in the upper-left triangular part, and it
   // operates from bottom to top of the matrix.
-  for (int current_row = start_row - 1;
-       current_row >= last_row_to_process; --current_row) {
+  for (int current_row = start_row - 1; current_row >= last_row_to_process;
+       --current_row) {
     // Column to process.
     const int col = current_row;
     // Eliminate coefficients in column.
@@ -167,11 +229,10 @@ void BottomUpGaussJordan(const int start_row,
 // input = | e f g h |  => TopDownGaussJordan =>  | 0 1 u v |
 //         | i j k l |                            | 0 0 w q |
 template <typename Derived>
-void GaussJordan(const int top_down_last_row,
-                 const int bottom_up_last_row,
+void GaussJordan(const int top_down_last_row, const int bottom_up_last_row,
                  Eigen::MatrixBase<Derived>* input) {
-  using internal::TopDownGaussJordan;
   using internal::BottomUpGaussJordan;
+  using internal::TopDownGaussJordan;
   // Eliminate lower-triangular part of the upper-left squared block of the
   // input matrix.
   const int num_rows_processed = TopDownGaussJordan(top_down_last_row, input);
@@ -194,6 +255,6 @@ void GaussJordan(Eigen::MatrixBase<Derived>* input) {
   GaussJordan(CHECK_NOTNULL(input)->rows() - 1, 0, input);
 }
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM
 
 #endif  // GRAPHSFM_MATH_MATRIX_GAUSS_JORDAN_H_

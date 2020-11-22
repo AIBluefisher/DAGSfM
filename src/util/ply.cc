@@ -31,9 +31,8 @@
 
 #include "util/ply.h"
 
-#include <fstream>
-
 #include <Eigen/Core>
+#include <fstream>
 
 #include "util/logging.h"
 #include "util/misc.h"

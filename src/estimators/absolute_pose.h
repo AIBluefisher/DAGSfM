@@ -32,10 +32,9 @@
 #ifndef COLMAP_SRC_ESTIMATORS_ABSOLUTE_POSE_H_
 #define COLMAP_SRC_ESTIMATORS_ABSOLUTE_POSE_H_
 
+#include <Eigen/Core>
 #include <array>
 #include <vector>
-
-#include <Eigen/Core>
 
 #include "util/alignment.h"
 #include "util/types.h"

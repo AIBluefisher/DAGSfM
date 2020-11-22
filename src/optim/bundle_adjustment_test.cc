@@ -30,13 +30,13 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "optim/bundle_adjustment"
-#include "util/testing.h"
+#include "optim/bundle_adjustment.h"
 
 #include "base/camera_models.h"
 #include "base/correspondence_graph.h"
 #include "base/projection.h"
-#include "optim/bundle_adjustment.h"
 #include "util/random.h"
+#include "util/testing.h"
 
 #define CheckVariableCamera(camera, orig_camera)          \
   {                                                       \

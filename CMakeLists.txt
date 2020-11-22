@@ -104,6 +104,7 @@ find_package(OpenGL REQUIRED)
 find_package(Glew REQUIRED)
 find_package(Git)
 
+find_package(igraph REQUIRED)
 find_package(RPCLib REQUIRED)
 if (RPCLIB_FOUND)
     include_directories(RPCLIB_INCLUDE_DIR)
@@ -312,6 +313,7 @@ set(COLMAP_INCLUDE_DIRS
     ${GTEST_INCLUDE_DIRS}
     ${FREEIMAGE_INCLUDE_DIRS}
     ${CERES_INCLUDE_DIRS}
+    ${IGRAPH_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
     ${Qt5Core_INCLUDE_DIRS}
     ${Qt5OpenGL_INCLUDE_DIRS}
@@ -332,6 +334,7 @@ set(COLMAP_EXTERNAL_LIBRARIES
     ${GTEST_LIBRARIES}
     ${FREEIMAGE_LIBRARIES}
     ${CERES_LIBRARIES}
+    ${IGRAPH_LIBRARIES}
     ${RPCLIB_LIBS}
     ${OPENGL_gl_LIBRARY}
     ${OPENGL_glu_LIBRARY}
@@ -356,7 +359,6 @@ set(COLMAP_INTERNAL_LIBRARIES
     graclus
     lsd
     pba
-    poisson_recon
     sqlite3
     sift_gpu
     vlfeat
@@ -391,7 +393,6 @@ COLMAP_ADD_SOURCE_DIR(lib/FLANN LIB_FLANN_SRCS *.h *.cpp *.hpp *.cu)
 COLMAP_ADD_SOURCE_DIR(lib/Graclus LIB_GRACLUS_SRCS *.h *.c)
 COLMAP_ADD_SOURCE_DIR(lib/LSD LIB_LSD_SRCS *.h *.c)
 COLMAP_ADD_SOURCE_DIR(lib/PBA LIB_PBA_SRCS *.h *.cpp *.cu)
-COLMAP_ADD_SOURCE_DIR(lib/PoissonRecon LIB_POISSON_RECON_SRCS *.h *.cpp *.inl)
 COLMAP_ADD_SOURCE_DIR(lib/SiftGPU LIB_SIFT_GPU_SRCS *.h *.cpp *.cu)
 COLMAP_ADD_SOURCE_DIR(lib/SQLite LIB_SQLITE_SRCS *.h *.c)
 COLMAP_ADD_SOURCE_DIR(lib/VLFeat LIB_VLFEAT_SRCS *.h *.c *.tc)
@@ -401,7 +402,6 @@ COLMAP_ADD_SOURCE_DIR(src/controllers CONTROLLERS_SRCS *.h *.cc)
 COLMAP_ADD_SOURCE_DIR(src/estimators ESTIMATORS_SRCS *.h *.cc)
 COLMAP_ADD_SOURCE_DIR(src/exe EXE_SRCS *.h *.cc)
 COLMAP_ADD_SOURCE_DIR(src/feature FEATURE_SRCS *.h *.cc)
-COLMAP_ADD_SOURCE_DIR(src/mvs MVS_SRCS *.h *.cc *.cu)
 COLMAP_ADD_SOURCE_DIR(src/optim OPTIM_SRCS *.h *.cc)
 COLMAP_ADD_SOURCE_DIR(src/retrieval RETRIEVAL_SRCS *.h *.cc)
 COLMAP_ADD_SOURCE_DIR(src/sfm SFM_SRCS *.h *.cc)
@@ -418,7 +418,6 @@ add_library(
     ${LIB_GRACLUS_SRCS}
     ${LIB_LSD_SRCS}
     ${LIB_PBA_SRCS}
-    ${LIB_POISSON_RECON_SRCS}
     ${LIB_SIFT_GPU_SRCS}
     ${LIB_SQLITE_SRCS}
     ${LIB_VLFEAT_SRCS}
@@ -427,7 +426,6 @@ add_library(
     ${ESTIMATORS_SRCS}
     ${EXE_SRCS}
     ${FEATURE_SRCS}
-    ${MVS_SRCS}
     ${OPTIM_SRCS}
     ${RETRIEVAL_SRCS}
     ${SFM_SRCS}

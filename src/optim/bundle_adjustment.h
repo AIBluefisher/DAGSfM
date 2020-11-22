@@ -32,16 +32,15 @@
 #ifndef COLMAP_SRC_OPTIM_BUNDLE_ADJUSTMENT_H_
 #define COLMAP_SRC_OPTIM_BUNDLE_ADJUSTMENT_H_
 
+#include <ceres/ceres.h>
+
+#include <Eigen/Core>
 #include <memory>
 #include <unordered_set>
 
-#include <Eigen/Core>
-
-#include <ceres/ceres.h>
-
+#include "PBA/pba.h"
 #include "base/camera_rig.h"
 #include "base/reconstruction.h"
-#include "PBA/pba.h"
 #include "util/alignment.h"
 
 namespace colmap {

@@ -86,21 +86,23 @@ double Timer::ElapsedMinutes() const { return ElapsedSeconds() / 60; }
 double Timer::ElapsedHours() const { return ElapsedMinutes() / 60; }
 
 void Timer::PrintSeconds() const {
-//   std::cout << StringPrintf("Elapsed time: %.5f [seconds]", ElapsedSeconds())
-            // << std::endl;
-    LOG(INFO) << "Elapsed time: " << ElapsedSeconds() << " [seconds]";
+  //   std::cout << StringPrintf("Elapsed time: %.5f [seconds]",
+  //   ElapsedSeconds())
+  // << std::endl;
+  LOG(INFO) << "Elapsed time: " << ElapsedSeconds() << " [seconds]";
 }
 
 void Timer::PrintMinutes() const {
-//   std::cout << StringPrintf("Elapsed time: %.3f [minutes]", ElapsedMinutes())
-            // << std::endl;
-    LOG(INFO) << "Elapsed time: " << ElapsedMinutes() << " [minutes]";
+  //   std::cout << StringPrintf("Elapsed time: %.3f [minutes]",
+  //   ElapsedMinutes())
+  // << std::endl;
+  LOG(INFO) << "Elapsed time: " << ElapsedMinutes() << " [minutes]";
 }
 
 void Timer::PrintHours() const {
-//   std::cout << StringPrintf("Elapsed time: %.3f [hours]", ElapsedHours())
-            // << std::endl;
-    LOG(INFO) << "Elapsed time: " << ElapsedHours() << " [hours]";
+  //   std::cout << StringPrintf("Elapsed time: %.3f [hours]", ElapsedHours())
+  // << std::endl;
+  LOG(INFO) << "Elapsed time: " << ElapsedHours() << " [hours]";
 }
 
 }  // namespace colmap

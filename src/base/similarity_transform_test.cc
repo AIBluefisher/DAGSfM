@@ -30,12 +30,12 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/similarity_transform"
-#include "util/testing.h"
+#include "base/similarity_transform.h"
 
 #include <Eigen/Core>
 
 #include "base/pose.h"
-#include "base/similarity_transform.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

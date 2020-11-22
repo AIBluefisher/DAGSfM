@@ -32,13 +32,12 @@
 #ifndef COLMAP_SRC_BASE_GRAPH_CUT_H_
 #define COLMAP_SRC_BASE_GRAPH_CUT_H_
 
-#include <unordered_map>
-#include <vector>
-
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/boykov_kolmogorov_max_flow.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/one_bit_color_map.hpp>
+#include <unordered_map>
+#include <vector>
 
 #include "util/logging.h"
 

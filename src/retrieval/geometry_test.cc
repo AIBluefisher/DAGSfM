@@ -31,12 +31,11 @@
 
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_MODULE "retrieval/geometry"
-#include <boost/test/unit_test.hpp>
+#include "retrieval/geometry.h"
 
 #include <Eigen/Dense>
+#include <boost/test/unit_test.hpp>
 #include <iostream>
-
-#include "retrieval/geometry.h"
 
 using namespace colmap::retrieval;
 

@@ -1,11 +1,12 @@
-#ifndef GRAPHSFM_UTIL_MAP_UTIL_H
-#define GRAPHSFM_UTIL_MAP_UTIL_H
+#ifndef DAGSfM_UTIL_MAP_UTIL_H
+#define DAGSfM_UTIL_MAP_UTIL_H
 
 #include <glog/logging.h>
+
 #include <iterator>
 #include <utility>
 
-namespace GraphSfM {
+namespace DAGSfM {
 // Perform a lookup in a map or hash_map, assuming that the key exists.
 // Crash if it does not.
 //
@@ -21,8 +22,7 @@ namespace GraphSfM {
 template <class Collection>
 typename Collection::value_type::second_type& FindOrDie(
     Collection& collection,  // NOLINT
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::iterator it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found: " << key;
   return it->second;
@@ -32,8 +32,7 @@ typename Collection::value_type::second_type& FindOrDie(
 template <class Collection>
 const typename Collection::value_type::second_type& FindOrDie(
     const Collection& collection,
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::const_iterator it = collection.find(key);
   CHECK(it != collection.end()) << "Map key not found: " << key;
   return it->second;
@@ -43,8 +42,7 @@ const typename Collection::value_type::second_type& FindOrDie(
 template <class Collection>
 typename Collection::value_type::second_type& FindOrDieNoPrint(
     Collection& collection,  // NOLINT
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::iterator it = collection.find(key);
   CHECK(it != collection.end());
   return it->second;
@@ -54,8 +52,7 @@ typename Collection::value_type::second_type& FindOrDieNoPrint(
 template <class Collection>
 const typename Collection::value_type::second_type& FindOrDieNoPrint(
     const Collection& collection,
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::const_iterator it = collection.find(key);
   CHECK(it != collection.end());
   return it->second;
@@ -68,8 +65,7 @@ template <class Collection>
 const typename Collection::value_type::second_type& FindWithDefault(
     const Collection& collection,
     const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& value) 
-{
+    const typename Collection::value_type::second_type& value) {
   typename Collection::const_iterator it = collection.find(key);
   if (it == collection.end()) {
     return value;
@@ -85,8 +81,7 @@ template <class Collection>
 bool InsertIfNotPresent(
     Collection* const collection,
     const typename Collection::value_type::first_type& key,
-    const typename Collection::value_type::second_type& value) 
-{
+    const typename Collection::value_type::second_type& value) {
   std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, value));
   return ret.second;
@@ -97,8 +92,7 @@ bool InsertIfNotPresent(
 // an insert took place, false indicates the value was already present.
 template <class Collection>
 bool InsertIfNotPresent(Collection* const collection,
-                        const typename Collection::value_type& value) 
-{
+                        const typename Collection::value_type& value) {
   std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(value));
   return ret.second;
@@ -110,8 +104,7 @@ bool InsertIfNotPresent(Collection* const collection,
 template <class Collection>
 typename Collection::value_type::second_type* FindOrNull(
     Collection& collection,  // NOLINT
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::iterator it = collection.find(key);
   if (it == collection.end()) {
     return 0;
@@ -125,8 +118,7 @@ typename Collection::value_type::second_type* FindOrNull(
 template <class Collection>
 const typename Collection::value_type::second_type* FindOrNull(
     const Collection& collection,
-    const typename Collection::value_type::first_type& key) 
-{
+    const typename Collection::value_type::first_type& key) {
   typename Collection::const_iterator it = collection.find(key);
   if (it == collection.end()) {
     return 0;
@@ -137,8 +129,7 @@ const typename Collection::value_type::second_type* FindOrNull(
 // Test to see if a set, map, hash_set or hash_map contains a particular key.
 // Returns true if the key is in the collection.
 template <class Collection, class Key>
-bool ContainsKey(const Collection& collection, const Key& key) 
-{
+bool ContainsKey(const Collection& collection, const Key& key) {
   typename Collection::const_iterator it = collection.find(key);
   return it != collection.end();
 }
@@ -148,22 +139,21 @@ bool ContainsKey(const Collection& collection, const Key& key)
 template <class Collection>
 void InsertOrDie(Collection* const collection,
                  const typename Collection::value_type::first_type& key,
-                 const typename Collection::value_type::second_type& data) 
-{
+                 const typename Collection::value_type::second_type& data) {
   typedef typename Collection::value_type value_type;
   CHECK(collection->insert(value_type(key, data)).second)
       << "duplicate key: " << key;
 }
 
 template <class Collection>
-void InsertOrDieNoPrint(Collection* const collection,
-                 const typename Collection::value_type::first_type& key,
-                 const typename Collection::value_type::second_type& data) 
-{
+void InsertOrDieNoPrint(
+    Collection* const collection,
+    const typename Collection::value_type::first_type& key,
+    const typename Collection::value_type::second_type& data) {
   typedef typename Collection::value_type value_type;
   CHECK(collection->insert(value_type(key, data)).second);
 }
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM
 
-#endif  // GRAPHSFM_UTIL_MAP_UTIL_H
+#endif  // DAGSfM_UTIL_MAP_UTIL_H

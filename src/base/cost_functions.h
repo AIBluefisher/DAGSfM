@@ -32,10 +32,10 @@
 #ifndef COLMAP_SRC_BASE_COST_FUNCTIONS_H_
 #define COLMAP_SRC_BASE_COST_FUNCTIONS_H_
 
-#include <Eigen/Core>
-
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
+
+#include <Eigen/Core>
 
 namespace colmap {
 
@@ -264,7 +264,7 @@ template <typename CameraModel>
 class BundleAdjustmentConstantRCostFunction {
  public:
   BundleAdjustmentConstantRCostFunction(const Eigen::Vector4d& qvec,
-                                           const Eigen::Vector2d& point2D)
+                                        const Eigen::Vector2d& point2D)
       : qvec_(qvec), point2D_(point2D) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector4d& qvec,
@@ -276,8 +276,8 @@ class BundleAdjustmentConstantRCostFunction {
   }
 
   template <typename T>
-  bool operator()(const T* const tvec_, const T* const point3D, const T* const camera_params,
-                  T* residuals) const {
+  bool operator()(const T* const tvec_, const T* const point3D,
+                  const T* const camera_params, T* residuals) const {
     T qvec[4] = {T(qvec_(0)), T(qvec_(1)), T(qvec_(2)), T(qvec_(3))};
 
     // Rotate and translate.
@@ -364,41 +364,39 @@ class RelativePoseCostFunction {
 
 class GPSCostFunction {
  public:
-  GPSCostFunction(const Eigen::Vector3d& gpsCenter)
-      : gpsCenter_(gpsCenter) {}
+  GPSCostFunction(const Eigen::Vector3d& gpsCenter) : gpsCenter_(gpsCenter) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector3d& gpsCenter) {
-    return (new ceres::AutoDiffCostFunction<
-            GPSCostFunction, 2, 3, 3>(
+    return (new ceres::AutoDiffCostFunction<GPSCostFunction, 2, 3, 3>(
         new GPSCostFunction(gpsCenter)));
   }
 
   template <typename T>
-  bool operator()(const T* const qvec, const T* const tvec, T* residuals) const
-  {
+  bool operator()(const T* const qvec, const T* const tvec,
+                  T* residuals) const {
     T scale_factor_x = (T)(1.0);
-    //T scale_factor_y = (T)(0.2);
+    // T scale_factor_y = (T)(0.2);
     T scale_factor_z = (T)(0.1);
 
     T C_angleaxis[3];
     C_angleaxis[0] = T(-qvec[0]);
-	C_angleaxis[1] = T(-qvec[1]);
-	C_angleaxis[2] = T(-qvec[2]);
+    C_angleaxis[1] = T(-qvec[1]);
+    C_angleaxis[2] = T(-qvec[2]);
     T C_trans[3] = {tvec[0], tvec[1], tvec[2]};
 
-	T C_center[3];
-    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center); // R^T * t
+    T C_center[3];
+    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center);  // R^T * t
 
     T C_d1 = -C_center[0] - gpsCenter_[0];
-	T C_d2 = -C_center[1] - gpsCenter_[1];
-	T C_d3 = -C_center[2] - gpsCenter_[2];
-	T dis_xy = C_d1*C_d1 + C_d2*C_d2;
-	T dis_zx = C_d3*C_d3;
-	//T dis_zy = C_d3*C_d3 + C_d2*C_d2;
+    T C_d2 = -C_center[1] - gpsCenter_[1];
+    T C_d3 = -C_center[2] - gpsCenter_[2];
+    T dis_xy = C_d1 * C_d1 + C_d2 * C_d2;
+    T dis_zx = C_d3 * C_d3;
+    // T dis_zy = C_d3*C_d3 + C_d2*C_d2;
 
     residuals[0] = scale_factor_x * dis_xy;
     residuals[1] = scale_factor_z * dis_zx;
-    //residuals[2] = scale_factor_z * C_d3;
+    // residuals[2] = scale_factor_z * C_d3;
     return true;
   }
 
@@ -408,39 +406,37 @@ class GPSCostFunction {
 
 class GPSCostFunction3 {
  public:
-  GPSCostFunction3(const Eigen::Vector3d& gpsCenter)
-      : gpsCenter_(gpsCenter) {}
+  GPSCostFunction3(const Eigen::Vector3d& gpsCenter) : gpsCenter_(gpsCenter) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector3d& gpsCenter) {
-    return (new ceres::AutoDiffCostFunction<
-            GPSCostFunction3, 1, 3, 3>(
+    return (new ceres::AutoDiffCostFunction<GPSCostFunction3, 1, 3, 3>(
         new GPSCostFunction3(gpsCenter)));
   }
 
   template <typename T>
-  bool operator()(const T* const qvec, const T* const tvec, T* residuals) const
-  {
+  bool operator()(const T* const qvec, const T* const tvec,
+                  T* residuals) const {
     T scale_factor_x = (T)(1.0);
-    //T scale_factor_y = (T)(0.2);
-    //T scale_factor_z = (T)(0.1);
+    // T scale_factor_y = (T)(0.2);
+    // T scale_factor_z = (T)(0.1);
 
     T C_angleaxis[3];
     C_angleaxis[0] = T(-qvec[0]);
-	C_angleaxis[1] = T(-qvec[1]);
-	C_angleaxis[2] = T(-qvec[2]);
+    C_angleaxis[1] = T(-qvec[1]);
+    C_angleaxis[2] = T(-qvec[2]);
     T C_trans[3] = {tvec[0], tvec[1], tvec[2]};
 
-	T C_center[3];
-    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center); // R^T * t
+    T C_center[3];
+    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center);  // R^T * t
 
     T C_d1 = -C_center[0] - gpsCenter_[0];
-	T C_d2 = -C_center[1] - gpsCenter_[1];
-	T C_d3 = -C_center[2] - gpsCenter_[2];
-	T dis_xyz = C_d1*C_d1 + C_d2*C_d2 + C_d3*C_d3;
+    T C_d2 = -C_center[1] - gpsCenter_[1];
+    T C_d3 = -C_center[2] - gpsCenter_[2];
+    T dis_xyz = C_d1 * C_d1 + C_d2 * C_d2 + C_d3 * C_d3;
 
     residuals[0] = scale_factor_x * dis_xyz;
-    //residuals[1] = scale_factor_z * dis_z;
-    //residuals[2] = scale_factor_z * C_d3;
+    // residuals[1] = scale_factor_z * dis_z;
+    // residuals[2] = scale_factor_z * C_d3;
     return true;
   }
 
@@ -454,30 +450,29 @@ class GPSCostFunction_XYZ {
       : gpsCenter_(gpsCenter) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector3d& gpsCenter) {
-    return (new ceres::AutoDiffCostFunction<
-            GPSCostFunction_XYZ, 3, 3, 3>(
+    return (new ceres::AutoDiffCostFunction<GPSCostFunction_XYZ, 3, 3, 3>(
         new GPSCostFunction_XYZ(gpsCenter)));
   }
 
   template <typename T>
-  bool operator()(const T* const qvec, const T* const tvec, T* residuals) const
-  {
+  bool operator()(const T* const qvec, const T* const tvec,
+                  T* residuals) const {
     T scale_factor_x = (T)(1.0);
     T scale_factor_y = (T)(1.0);
     T scale_factor_z = (T)(1.0);
 
     T C_angleaxis[3];
     C_angleaxis[0] = T(-qvec[0]);
-	C_angleaxis[1] = T(-qvec[1]);
-	C_angleaxis[2] = T(-qvec[2]);
+    C_angleaxis[1] = T(-qvec[1]);
+    C_angleaxis[2] = T(-qvec[2]);
     T C_trans[3] = {tvec[0], tvec[1], tvec[2]};
 
-	T C_center[3];
-    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center); // R^T * t
+    T C_center[3];
+    ceres::AngleAxisRotatePoint(C_angleaxis, C_trans, C_center);  // R^T * t
 
     T C_d1 = -C_center[0] - gpsCenter_[0];
-	T C_d2 = -C_center[1] - gpsCenter_[1];
-	T C_d3 = -C_center[2] - gpsCenter_[2];
+    T C_d2 = -C_center[1] - gpsCenter_[1];
+    T C_d3 = -C_center[2] - gpsCenter_[2];
 
     residuals[0] = scale_factor_x * C_d1;
     residuals[1] = scale_factor_y * C_d2;

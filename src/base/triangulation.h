@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_BASE_TRIANGULATION_H_
 #define COLMAP_SRC_BASE_TRIANGULATION_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 #include "base/camera.h"
 #include "util/alignment.h"

@@ -32,10 +32,11 @@
 #ifndef COLMAP_SRC_FEATURE_TYPES_H_
 #define COLMAP_SRC_FEATURE_TYPES_H_
 
+#include <Eigen/Core>
+#include <rpc/msgpack.hpp>
 #include <vector>
 
-#include <Eigen/Core>
-
+#include "map_reduce/msgpack_adaptor.h"
 #include "util/types.h"
 
 namespace colmap {
@@ -75,6 +76,8 @@ struct FeatureKeypoint {
   float a12;
   float a21;
   float a22;
+
+  MSGPACK_DEFINE(x, y, a11, a12, a21, a22);
 };
 
 typedef Eigen::Matrix<uint8_t, 1, Eigen::Dynamic, Eigen::RowMajor>
@@ -91,6 +94,8 @@ struct FeatureMatch {
 
   // Feature index in second image.
   point2D_t point2D_idx2 = kInvalidPoint2DIdx;
+
+  MSGPACK_DEFINE(point2D_idx1, point2D_idx2);
 };
 
 typedef std::vector<FeatureKeypoint> FeatureKeypoints;

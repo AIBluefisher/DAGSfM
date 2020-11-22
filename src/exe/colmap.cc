@@ -29,6 +29,38 @@
 //
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
+// BSD 3-Clause License
+
+// Copyright (c) 2020, Chenyu
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// 1. Redistributions of source code must retain the above copyright notice,
+// this
+//    list of conditions and the following disclaimer.
+
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -36,12 +68,12 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include "base/database_info.h"
 #include "base/similarity_transform.h"
 #include "controllers/automatic_reconstruction.h"
 #include "controllers/bundle_adjustment.h"
-#include "controllers/hierarchical_mapper.h"
-#include "controllers/sfm_aligner.h"
 #include "controllers/distributed_mapper_controller.h"
+#include "controllers/sfm_aligner.h"
 #include "estimators/coordinate_frame.h"
 #include "feature/extraction.h"
 #include "feature/matching.h"
@@ -53,7 +85,6 @@
 #include "util/version.h"
 
 using namespace colmap;
-using namespace GraphSfM;
 
 DEFINE_string(log_directory, "", "directory to store log file.");
 
@@ -103,8 +134,7 @@ int RunAutomaticReconstructor(int argc, char** argv) {
   options.AddRequiredOption("workspace_path",
                             &reconstruction_options.workspace_path);
   options.AddRequiredOption("image_path", &reconstruction_options.image_path);
-  options.AddDefaultOption("mask_path",
-                           &reconstruction_options.mask_path);
+  options.AddDefaultOption("mask_path", &reconstruction_options.mask_path);
   options.AddDefaultOption("vocab_tree_path",
                            &reconstruction_options.vocab_tree_path);
   options.AddDefaultOption("data_type", &data_type,
@@ -722,6 +752,7 @@ int RunMapper(int argc, char** argv) {
   std::string input_path;
   std::string output_path;
   std::string image_list_path;
+  FLAGS_log_dir = argv[1];
 
   OptionManager options;
   options.AddDatabaseOptions();
@@ -732,10 +763,7 @@ int RunMapper(int argc, char** argv) {
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
-  if (!ExistsDir(output_path)) {
-    std::cerr << "ERROR: `output_path` is not a directory." << std::endl;
-    return EXIT_FAILURE;
-  }
+  CreateDirIfNotExists(output_path);
 
   if (!image_list_path.empty()) {
     const auto image_names = ReadTextFileLines(image_list_path);
@@ -778,135 +806,124 @@ int RunMapper(int argc, char** argv) {
         });
   }
 
+  Timer timer;
+
+  timer.Start();
   mapper.Start();
   mapper.Wait();
+  timer.Pause();
 
   // In case the reconstruction is continued from an existing reconstruction, do
   // not create sub-folders but directly write the results.
   if (input_path != "" && reconstruction_manager.Size() > 0) {
     reconstruction_manager.Get(0).Write(output_path);
+    reconstruction_manager.Get(0).ShowReconInfo();
   }
+
+  LOG(INFO) << "Time elapsed for sfm(COLMAP): " << timer.ElapsedSeconds();
 
   return EXIT_SUCCESS;
 }
 
-int RunHierarchicalMapper(int argc, char** argv) {
-  HierarchicalMapperController::Options hierarchical_options;
-  SceneClustering::Options clustering_options;
+int RunDistributedMapper(int argc, char** argv) {
+  using namespace DAGSfM;
+  DistributedMapperController::Options distributed_options;
+  SiftExtractionOptions extraction_options;
+  VocabSimilaritySearchOptions search_options;
+  ImageClustering::Options clustering_options;
   std::string output_path;
+  std::string config_file_name = "";
+  FLAGS_log_dir = argv[1];
 
   OptionManager options;
   options.AddRequiredOption("database_path",
-                            &hierarchical_options.database_path);
-  options.AddRequiredOption("image_path", &hierarchical_options.image_path);
+                            &distributed_options.database_path);
+  options.AddRequiredOption("image_path", &distributed_options.image_path);
   options.AddRequiredOption("output_path", &output_path);
-  options.AddDefaultOption("num_workers", &hierarchical_options.num_workers);
+  options.AddRequiredOption("vocab_tree_path", &search_options.vocab_tree_path);
+  options.AddDefaultOption("use_gpu", &extraction_options.use_gpu);
+  options.AddDefaultOption("gpu_index", &extraction_options.gpu_index);
+  options.AddDefaultOption("transfer_images_to_server",
+                           &distributed_options.transfer_images_to_server);
+  options.AddDefaultOption("num_workers", &distributed_options.num_workers);
+  options.AddDefaultOption("distributed", &distributed_options.distributed);
+  options.AddDefaultOption("config_file_name", &config_file_name);
+  options.AddDefaultOption("assign_cluster_id",
+                           &distributed_options.assign_cluster_id);
+  options.AddDefaultOption("write_binary", &distributed_options.write_binary);
+  options.AddDefaultOption("retriangulate", &distributed_options.retriangulate);
+  options.AddDefaultOption("final_ba", &distributed_options.final_ba);
+  options.AddDefaultOption(
+      "select_tracks_for_bundle_adjustment",
+      &distributed_options.select_tracks_for_bundle_adjustment);
+  options.AddDefaultOption("long_track_length_threshold",
+                           &distributed_options.long_track_length_threshold);
+  options.AddDefaultOption("image_grid_cell_size_pixels",
+                           &distributed_options.image_grid_cell_size_pixels);
+  options.AddDefaultOption(
+      "min_num_optimized_tracks_per_view",
+      &distributed_options.min_num_optimized_tracks_per_view);
   options.AddDefaultOption("image_overlap", &clustering_options.image_overlap);
-  options.AddDefaultOption("leaf_max_num_images",
-                           &clustering_options.leaf_max_num_images);
-  options.AddMapperOptions();
+  options.AddDefaultOption("num_images_ub", &clustering_options.num_images_ub);
+  options.AddDefaultOption("completeness_ratio",
+                           &clustering_options.completeness_ratio);
+  options.AddDefaultOption("relax_ratio", &clustering_options.relax_ratio);
+  options.AddDefaultOption("max_num_cluster_pairs",
+                           &clustering_options.max_num_cluster_pairs);
+  options.AddDefaultOption("cluster_type", &clustering_options.cluster_type);
+  options.AddDefaultOption("graph_dir", &clustering_options.graph_dir);
+  options.AddDefaultOption("num_images", &search_options.num_images);
+  options.AddDefaultOption("num_nearest_neighbors",
+                           &search_options.num_nearest_neighbors);
+  options.AddDefaultOption("num_checks", &search_options.num_checks);
+  options.AddDefaultOption("num_images_after_verification",
+                           &search_options.num_images_after_verification);
+  options.AddDefaultOption("max_num_features",
+                           &search_options.max_num_features);
   options.Parse(argc, argv);
 
-  if (!ExistsDir(output_path)) {
-    std::cerr << "ERROR: `output_path` is not a directory." << std::endl;
-    return EXIT_FAILURE;
-  }
+  CreateDirIfNotExists(output_path);
+
+  distributed_options.output_path = output_path;
 
   ReconstructionManager reconstruction_manager;
 
-  HierarchicalMapperController hierarchical_mapper(
-      hierarchical_options, clustering_options, *options.mapper,
-      &reconstruction_manager);
-  hierarchical_mapper.Start();
-  hierarchical_mapper.Wait();
+  DistributedMapperController distributed_mapper(
+      distributed_options, search_options, extraction_options,
+      clustering_options, *options.mapper, &reconstruction_manager);
 
-  reconstruction_manager.Write(output_path, &options);
+  if (distributed_options.distributed) {
+    MapReduceConfig map_reduce_config;
+    if (!map_reduce_config.ReadConfig(config_file_name)) {
+      return 0;
+    }
+
+    distributed_mapper.SetMapReduceConfig(map_reduce_config);
+  }
+
+  distributed_mapper.Start();
+  distributed_mapper.Wait();
+
+  for (size_t i = 0; i < reconstruction_manager.Size(); ++i) {
+    const std::string reconstruction_path =
+        JoinPaths(output_path, std::to_string(i));
+    CreateDirIfNotExists(reconstruction_path);
+
+    if (distributed_options.write_binary) {
+      reconstruction_manager.Get(i).WriteBinary(reconstruction_path);
+    } else {
+      reconstruction_manager.Get(i).WriteText(reconstruction_path);
+    }
+  }
 
   return EXIT_SUCCESS;
-}
-
-int RunDistributedMapper(int argc, char** argv) 
-{
-    using namespace GraphSfM;
-    DistributedMapperController::Options distributed_options;
-    ImageClustering::Options clustering_options;
-    std::string output_path;
-    std::string config_file_name = "";
-    FLAGS_log_dir = argv[1];
-
-    OptionManager options;
-    options.AddRequiredOption("database_path",
-                              &distributed_options.database_path);
-    options.AddRequiredOption("image_path", &distributed_options.image_path);
-    options.AddRequiredOption("output_path", &output_path);
-    options.AddDefaultOption("transfer_images_to_server", 
-                             &distributed_options.transfer_images_to_server);
-    options.AddDefaultOption("num_workers", &distributed_options.num_workers);
-    options.AddDefaultOption("distributed", &distributed_options.distributed);
-    options.AddDefaultOption("config_file_name", &config_file_name);
-    options.AddDefaultOption("repartition", &distributed_options.is_repartition_for_mvs);
-    options.AddDefaultOption("assign_cluster_id", &distributed_options.assign_cluster_id);
-    options.AddDefaultOption("write_binary", &distributed_options.write_binary);
-    options.AddDefaultOption("retriangulate", &distributed_options.retriangulate);
-    options.AddDefaultOption("final_ba", &distributed_options.final_ba);
-    options.AddDefaultOption("select_tracks_for_bundle_adjustment",
-                             &distributed_options.select_tracks_for_bundle_adjustment);
-    options.AddDefaultOption("long_track_length_threshold", 
-                             &distributed_options.long_track_length_threshold);
-    options.AddDefaultOption("image_grid_cell_size_pixels", 
-                             &distributed_options.image_grid_cell_size_pixels);
-    options.AddDefaultOption("min_num_optimized_tracks_per_view", 
-                             &distributed_options.min_num_optimized_tracks_per_view);
-    options.AddDefaultOption("image_overlap", &clustering_options.image_overlap);
-    options.AddDefaultOption("num_images_ub",
-                             &clustering_options.num_images_ub);
-    options.AddDefaultOption("completeness_ratio", &clustering_options.completeness_ratio);
-    options.AddDefaultOption("relax_ratio", &clustering_options.relax_ratio);
-    options.AddDefaultOption("max_num_cluster_pairs", &clustering_options.max_num_cluster_pairs);
-    options.AddDefaultOption("cluster_type", &clustering_options.cluster_type);
-    options.AddMapperOptions();
-    options.Parse(argc, argv);
-
-    CreateDirIfNotExists(output_path);
-
-    distributed_options.output_path = output_path;
-
-    ReconstructionManager reconstruction_manager;
-
-    DistributedMapperController distributed_mapper(
-        distributed_options, clustering_options, *options.mapper,
-        &reconstruction_manager);
-    
-    if (distributed_options.distributed) {
-        MapReduceConfig map_reduce_config;
-        if (!map_reduce_config.ReadConfig(config_file_name)) {
-            return 0;
-        }
-
-        distributed_mapper.SetMapReduceConfig(map_reduce_config);
-    }
-
-    distributed_mapper.Start();
-    distributed_mapper.Wait();
-
-    for (size_t i = 0; i < reconstruction_manager.Size(); ++i) {
-        const std::string reconstruction_path = JoinPaths(output_path, std::to_string(i));
-        CreateDirIfNotExists(reconstruction_path);
-
-        if (distributed_options.write_binary) {
-            reconstruction_manager.Get(i).WriteBinary(reconstruction_path);
-        } else {
-            reconstruction_manager.Get(i).WriteText(reconstruction_path);
-        }
-    }
-
-    return EXIT_SUCCESS;
 }
 
 int RunLocalSfMWorker(int argc, char** argv) {
   std::string input_path;
   std::string output_path;
   std::string image_list_path;
+  // FLAGS_log_dir = argv[1];
 
   OptionManager options;
   options.AddRequiredOption("output_path", &output_path);
@@ -922,167 +939,120 @@ int RunLocalSfMWorker(int argc, char** argv) {
   }
 
   ReconstructionManager reconstruction_manager;
-
   IncrementalMapperController mapper(options.mapper.get(),
                                      &reconstruction_manager);
   rpc::server& srv = mapper.Server();
-  srv.bind("RunSfM", [&](DatabaseCache& database_cache){
-      LOG(INFO) << "RunSfM";
-      mapper.SetDatabaseCache(&database_cache);
-    //   mapper.RunSfM();
-      LOG(INFO) << "Start";
-      mapper.Start();
-      mapper.Wait();
+  bool exit = false;
+  bool working = false;
+
+  srv.bind("RunMatching", [&](const std::vector<std::string>& image_list,
+                              std::vector<ImageNamePair>& image_pairs,
+                              const size_t job_id) {
+    LOG(INFO) << "Running Local Matching of job " << job_id;
+    // mapper.SetDatabaseCache(&database_cache);
+    const std::string database_path =
+        JoinPaths(output_path, std::to_string(job_id));
+    // CreateDirIfNotExists(database_path);
+
+    const std::string local_image_path = JoinPaths(database_path, "images");
+    // CreateDirIfNotExists(local_image_path);
+    LOG(INFO) << "image nums: " << image_list.size();
+    LOG(INFO) << "matching pairs: " << image_pairs.size();
+
+    mapper.SetImagePath(local_image_path);
+    mapper.SetDatabasePath(database_path);
+    mapper.SetImageList(image_list);
+    mapper.SetImagePairs(image_pairs);
+
+    working = true;
+    mapper.ExtractFeatureAndMatch();
+    working = false;
   });
-  
-  //   srv.run();
+
+  srv.bind("RunSfM", [&](DatabaseCache& database_cache) {
+    LOG(INFO) << "Running Local SfM";
+    mapper.SetDatabaseCache(&database_cache);
+    // mapper.RunSfM();
+    working = true;
+    mapper.Start();
+    mapper.Wait();
+    working = false;
+  });
+
+  srv.bind("Exit", [&]() { exit = true; });
+
   srv.async_run(2);
-  std::cin.ignore();
+
+  while (!exit) {
+    if (!working) {
+      LOG(INFO) << "Waitting jobs.(Exit Status: " << exit << ")";
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+  }
 
   return EXIT_SUCCESS;
 }
 
 int RunSfMAligner(int argc, char** argv) {
-    std::string reconstructions_path;
-    bool assign_color_for_clusters;
-    FLAGS_log_dir = argv[1];
+  std::string reconstructions_path;
+  bool assign_color_for_clusters;
+  FLAGS_log_dir = argv[1];
 
-    OptionManager options;
-    options.AddRequiredOption("reconstructions_path", &reconstructions_path);
-    options.AddDefaultOption("assign_color_for_clusters", &assign_color_for_clusters);
-    options.AddMapperOptions();
-    options.Parse(argc, argv);
+  OptionManager options;
+  options.AddRequiredOption("reconstructions_path", &reconstructions_path);
+  options.AddDefaultOption("assign_color_for_clusters",
+                           &assign_color_for_clusters);
+  options.Parse(argc, argv);
 
-    std::vector<Reconstruction*> recons;
+  std::vector<Reconstruction*> recons;
 
-    const std::vector<std::string> dirs = GetRecursiveDirList(reconstructions_path);
-    recons.reserve(dirs.size());
-    LOG(INFO) << "Loading existing maps.";
-    for (auto path : dirs) {
-        Reconstruction* recon = new Reconstruction();
-        if (ExistsFile(JoinPaths(path, "cameras.bin")) &&
-            ExistsFile(JoinPaths(path, "images.bin")) &&
-            ExistsFile(JoinPaths(path, "points3D.bin"))) {
-            recon->ReadBinary(path);
-        } else if (ExistsFile(JoinPaths(path, "cameras.txt")) &&
-                   ExistsFile(JoinPaths(path, "images.txt")) &&
-                   ExistsFile(JoinPaths(path, "points3D.txt"))) {
-            recon->ReadText(path);
-        } else {
-            LOG(WARNING) << "cameras, images, points3D files do not exist at " << path;
-            continue;
-        }
-        recons.push_back(recon);
+  const std::vector<std::string> dirs =
+      GetRecursiveDirList(reconstructions_path);
+  recons.reserve(dirs.size());
+  LOG(INFO) << "Loading existing maps.";
+  for (auto path : dirs) {
+    Reconstruction* recon = new Reconstruction();
+    if (ExistsFile(JoinPaths(path, "cameras.bin")) &&
+        ExistsFile(JoinPaths(path, "images.bin")) &&
+        ExistsFile(JoinPaths(path, "points3D.bin"))) {
+      recon->ReadBinary(path);
+    } else if (ExistsFile(JoinPaths(path, "cameras.txt")) &&
+               ExistsFile(JoinPaths(path, "images.txt")) &&
+               ExistsFile(JoinPaths(path, "points3D.txt"))) {
+      recon->ReadText(path);
+    } else {
+      LOG(WARNING) << "cameras, images, points3D files do not exist at "
+                   << path;
+      continue;
     }
+    recons.push_back(recon);
+  }
 
-    using namespace GraphSfM;
-    SfMAligner::AlignOptions align_options;
-    align_options.assign_color_for_clusters = assign_color_for_clusters;
-    SfMAligner sfm_aligner(recons, align_options);
+  using namespace DAGSfM;
+  SfMAligner::AlignOptions align_options;
+  align_options.assign_color_for_clusters = assign_color_for_clusters;
+  SfMAligner sfm_aligner(recons, align_options);
 
-    Node anchor_node;
+  Node anchor_node;
 
-    if (sfm_aligner.Align()) {
-        anchor_node = sfm_aligner.GetAnchorNode();
-    }
+  if (sfm_aligner.Align()) {
+    anchor_node = sfm_aligner.GetAnchorNode();
+  }
 
-    CHECK_NE(anchor_node.id, -1);
-    CHECK_NOTNULL(recons[anchor_node.id]);
+  CHECK_NE(anchor_node.id, -1);
+  CHECK_NOTNULL(recons[anchor_node.id]);
 
-    std::string output_path = JoinPaths(reconstructions_path, "merged");
-    CreateDirIfNotExists(output_path);
+  std::string output_path = JoinPaths(reconstructions_path, "merged");
+  CreateDirIfNotExists(output_path);
 
-    LOG(INFO) << "Exporting merged map to " << output_path;
-    recons[anchor_node.id]->WriteBinary(JoinPaths(output_path, "merged"));
+  LOG(INFO) << "Exporting merged map to " << output_path;
+  recons[anchor_node.id]->WriteBinary(output_path);
 
-    for (uint i = 0; i < recons.size(); i++) {
-        delete recons[i];
-    }
+  for (uint i = 0; i < recons.size(); i++) {
+    delete recons[i];
+  }
 
-    return EXIT_SUCCESS;
-}
-
-int RunPointCloudSegmenter(int argc, char** argv) {
-    std::string colmap_data_path;
-    std::string output_path;
-    int max_image_num;
-    bool write_binary = true;
-
-    OptionManager options;
-    options.AddRequiredOption("colmap_data_path", &colmap_data_path);
-    options.AddRequiredOption("output_path", &output_path);
-    options.AddRequiredOption("max_image_num", &max_image_num);
-    options.AddDefaultOption("write_binary", &write_binary);
-    options.Parse(argc, argv);
-
-    Reconstruction reconstruction;
-    reconstruction.Read(colmap_data_path);
-
-    using namespace GraphSfM;
-    
-    std::vector<image_t> reg_image_ids = reconstruction.RegImageIds();
-    const double epsilon = 0.9;
-
-    // Image projection centers are used to compute the weight.
-    std::vector<Eigen::Vector3d> reg_image_centers;
-    reg_image_centers.reserve(reg_image_ids.size());
-    for (auto image_id : reg_image_ids) {
-        reg_image_centers.push_back(reconstruction.Image(image_id).ProjectionCenter());
-    }
-
-    ImageCluster root_cluster;
-    root_cluster.image_ids = reg_image_ids;
-    for (uint i = 0; i < reg_image_centers.size(); i++) {
-        for (uint j = i + 1; j < reg_image_centers.size(); j++) {
-            const double diff = (reg_image_centers[i] - reg_image_centers[j]).norm();
-            if (diff > epsilon) continue;
-            const ViewIdPair view_pair = reg_image_ids[i] > reg_image_ids[j] ?
-                                         ViewIdPair(reg_image_ids[j], reg_image_ids[i]) :
-                                         ViewIdPair(reg_image_ids[i], reg_image_ids[j]);
-            root_cluster.edges[view_pair] = diff < 1e-6 ? 10000 : 10 / diff;
-        }
-    }
-
-    // Configure image cluster.
-    ImageClustering::Options cluster_options;
-    cluster_options.cluster_type = "NCUT";
-
-    // Segment sparse point clouds and camera poses.
-    ImageClustering image_cluster(cluster_options, root_cluster);
-    image_cluster.Cut();
-
-    std::vector<ImageCluster> intra_clusters = image_cluster.GetIntraClusters();
-    for (uint i = 0; i < intra_clusters.size(); i++) {
-        const std::string reconstruction_path = JoinPaths(output_path, 
-                                                  "segment" + std::to_string(i));
-        CreateDirIfNotExists(reconstruction_path);
-
-        EIGEN_STL_UMAP(camera_t, class Camera) cameras = reconstruction.Cameras();;
-        EIGEN_STL_UMAP(image_t, class Image) images;
-        EIGEN_STL_UMAP(point3D_t, class Point3D) points3D;
-
-        const std::vector<image_t> image_ids = intra_clusters[i].image_ids;
-        for (auto image_id : image_ids) {
-            images[image_id] = reconstruction.Image(image_id);
-            for (const Point2D point2D : images[image_id].Points2D()) {
-                if (point2D.HasPoint3D()) {
-                    points3D[point2D.Point3DId()] = reconstruction.Point3D(point2D.Point3DId());
-                }
-            }
-        }
-        
-        if (write_binary) {
-            WriteCamerasBinary(cameras, JoinPaths(reconstruction_path, "cameras.bin"));
-            WriteImagesBinary(images, JoinPaths(reconstruction_path, "images.bin"));
-            WritePoints3DBinary(points3D, JoinPaths(reconstruction_path, "points3D.bin"));
-        } else {
-            WriteCamerasText(cameras, JoinPaths(reconstruction_path, "cameras.txt"));
-            WriteImagesText(images, JoinPaths(reconstruction_path, "images.txt"));
-            WritePoints3DText(images, points3D, JoinPaths(reconstruction_path, "points3D.txt"));
-        }
-    }
-
-    return EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int RunMatchesImporter(int argc, char** argv) {
@@ -2129,11 +2099,9 @@ int main(int argc, char** argv) {
   commands.emplace_back("exhaustive_matcher", &RunExhaustiveMatcher);
   commands.emplace_back("feature_extractor", &RunFeatureExtractor);
   commands.emplace_back("feature_importer", &RunFeatureImporter);
-  commands.emplace_back("hierarchical_mapper", &RunHierarchicalMapper);
   commands.emplace_back("distributed_mapper", &RunDistributedMapper);
   commands.emplace_back("local_sfm_worker", &RunLocalSfMWorker);
   commands.emplace_back("sfm_aligner", &RunSfMAligner);
-  commands.emplace_back("point_cloud_segmenter", &RunPointCloudSegmenter);
   commands.emplace_back("image_deleter", &RunImageDeleter);
   commands.emplace_back("image_filterer", &RunImageFilterer);
   commands.emplace_back("image_rectifier", &RunImageRectifier);

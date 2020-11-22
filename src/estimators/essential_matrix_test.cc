@@ -30,17 +30,17 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "estimators/essential_matrix"
-#include "util/testing.h"
+#include "base/essential_matrix.h"
 
 #include <Eigen/Core>
 
 #include "base/camera_models.h"
-#include "base/essential_matrix.h"
 #include "base/pose.h"
 #include "base/projection.h"
 #include "estimators/essential_matrix.h"
 #include "optim/ransac.h"
 #include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

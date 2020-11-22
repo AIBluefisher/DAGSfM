@@ -30,9 +30,9 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "estimators/coordinate_frame"
-#include "util/testing.h"
-
 #include "estimators/coordinate_frame.h"
+
+#include "util/testing.h"
 
 using namespace colmap;
 

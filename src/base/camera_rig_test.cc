@@ -30,9 +30,9 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/camera_rig"
-#include "util/testing.h"
-
 #include "base/camera_rig.h"
+
+#include "util/testing.h"
 
 using namespace colmap;
 

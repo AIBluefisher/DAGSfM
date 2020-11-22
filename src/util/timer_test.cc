@@ -30,9 +30,9 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "util/timer"
-#include "util/testing.h"
-
 #include "util/timer.h"
+
+#include "util/testing.h"
 
 using namespace colmap;
 

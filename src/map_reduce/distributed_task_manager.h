@@ -1,3 +1,35 @@
+// BSD 3-Clause License
+
+// Copyright (c) 2020, Chenyu
+// All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+
+// 1. Redistributions of source code must retain the above copyright notice,
+// this
+//    list of conditions and the following disclaimer.
+
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+
+// 3. Neither the name of the copyright holder nor the names of its
+//    contributors may be used to endorse or promote products derived from
+//    this software without specific prior written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef _SRC_MAPREDUCE_DISTRIBUTED_TASK_MANAGER_H_
 #define _SRC_MAPREDUCE_DISTRIBUTED_TASK_MANAGER_H_
 
@@ -13,12 +45,13 @@
 #include <vector>
 
 #include "base/database_cache.h"
+#include "base/database_info.h"
 #include "base/reconstruction.h"
 #include "clustering/image_clustering.h"
 #include "map_reduce/master.h"
 #include "util/types.h"
 
-namespace GraphSfM {
+namespace DAGSfM {
 
 enum class DistributedDataType { SFM, MATCHING };
 
@@ -37,6 +70,47 @@ struct TaskDataContainer {
   virtual void MergeData(){};
 };
 
+struct MatchesDataContainer : public TaskDataContainer {
+  std::vector<DatabaseInfo> database_infos;
+  std::unordered_map<size_t, std::vector<ImageNamePair>> cluster_matching_pairs;
+
+  std::unordered_map<std::string, image_t> image_name_to_id;
+
+  virtual void DistributeTask(const size_t job_id,
+                              const int worker_id) override {
+    rpc::client c(server_ips[worker_id], server_ports[worker_id]);
+
+    const std::vector<std::string>& image_names = cluster_images[job_id];
+    const std::vector<ImageNamePair>& image_pairs =
+        cluster_matching_pairs[job_id];
+
+    c.async_call("RunMatching", image_names, image_pairs, job_id);
+    c.call("SetNonIdle");
+  }
+
+  virtual void ReduceTask(const int worker_id) override {
+    rpc::client c(server_ips[worker_id], server_ports[worker_id]);
+
+    auto local_database_info_obj = c.call("GetLocalDatabaseInfo");
+
+    DatabaseInfo local_database_info =
+        local_database_info_obj.get().as<DatabaseInfo>();
+    database_infos.emplace_back(local_database_info);
+
+    c.async_call("ResetWorkerInfo");
+  }
+
+  virtual void MergeData() override {
+    CHECK_GT(database_infos.size(), 0);
+    database_infos[0].UpdateImageIndex(image_name_to_id);
+
+    for (uint i = 1; i < database_infos.size(); i++) {
+      database_infos[i].UpdateImageIndex(image_name_to_id);
+      database_infos[0].Merge(database_infos[i]);
+    }
+  }
+};
+
 struct SfMDataContainer : public TaskDataContainer {
   std::vector<Reconstruction> reconstructions;
   std::unordered_map<size_t, DatabaseCache> cluster_database_caches;
@@ -44,9 +118,7 @@ struct SfMDataContainer : public TaskDataContainer {
   virtual void DistributeTask(const size_t job_id,
                               const int worker_id) override {
     rpc::client c(server_ips[worker_id], server_ports[worker_id]);
-    LOG(INFO) << "Call run sfm";
     c.async_call("RunSfM", cluster_database_caches[job_id]);
-    LOG(INFO) << "end call RunSfM";
     c.call("SetNonIdle");
   }
 
@@ -221,7 +293,7 @@ inline void DistributedTaskManager<DataType>::IncrementFinishedJobNum() {
   finished_jobs_mutex_.unlock();
 };
 
-}  // namespace GraphSfM
+}  // namespace DAGSfM
 
 #include "map_reduce/distributed_task_manager.inl"
 

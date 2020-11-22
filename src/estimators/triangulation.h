@@ -32,12 +32,10 @@
 #ifndef COLMAP_SRC_ESTIMATORS_TRIANGULATION_H_
 #define COLMAP_SRC_ESTIMATORS_TRIANGULATION_H_
 
-#include "base/camera.h"
-
+#include <Eigen/Core>
 #include <vector>
 
-#include <Eigen/Core>
-
+#include "base/camera.h"
 #include "optim/ransac.h"
 #include "util/alignment.h"
 #include "util/math.h"

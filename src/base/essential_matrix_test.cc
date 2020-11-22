@@ -30,13 +30,13 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "base/essential_matrix"
-#include "util/testing.h"
+#include "base/essential_matrix.h"
 
 #include <Eigen/Geometry>
 
-#include "base/essential_matrix.h"
 #include "base/pose.h"
 #include "base/projection.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

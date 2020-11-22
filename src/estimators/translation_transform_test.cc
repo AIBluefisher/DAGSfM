@@ -30,13 +30,13 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "estimators/translation_transform"
-#include "util/testing.h"
+#include "estimators/translation_transform.h"
 
 #include <Eigen/Core>
 
-#include "estimators/translation_transform.h"
 #include "optim/ransac.h"
 #include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 

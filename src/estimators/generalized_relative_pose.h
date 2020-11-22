@@ -32,9 +32,8 @@
 #ifndef COLMAP_SRC_ESTIMATORS_GENERALIZED_RELATIVE_POSE_H_
 #define COLMAP_SRC_ESTIMATORS_GENERALIZED_RELATIVE_POSE_H_
 
-#include <vector>
-
 #include <Eigen/Core>
+#include <vector>
 
 #include "util/alignment.h"
 #include "util/types.h"
@@ -83,8 +82,8 @@ class GR6PEstimator {
 
   // Calculate the squared Sampson error between corresponding points.
   static void Residuals(const std::vector<X_t>& points1,
-                        const std::vector<Y_t>& points2,
-                        const M_t& proj_matrix, std::vector<double>* residuals);
+                        const std::vector<Y_t>& points2, const M_t& proj_matrix,
+                        std::vector<double>* residuals);
 };
 
 }  // namespace colmap

@@ -1,0 +1,40 @@
+- 2020.06.24
+  - Refactor distributed SfM and distributed matching in a consistent architecture.
+  - Distributed matching.
+  - Replaced vocabulary tree by deep learning model.
+  - Use `Image Graph`, `Similarity Graph`, `View Graph` to handle different distributed tasks.
+
+- 2020.04.11
+  - Interface for extracting largest connected component in graph implementation.
+  - Merge largest connected component in SfMAligner.
+  - Command line helper for merging multiple local maps.
+  - Command line helper for segmenting large scale map into several sub-maps.
+
+- 2020.04.10
+  - Select good tracks for final bundle adjustment.
+  - Image transfer from master to workers.
+  - Extract largest connected component for Structure-from-Motion.
+
+- 2020.03.04
+  - Using sparse matrix in Lagrange rotation averaging estimator. 
+    The efficiency for both row-by-row SDP solver and rank-deficient solver are highly improved. 
+    Rank-deficient solver is the fastest among current existing rotation averaging solver. (the solver is not public now.)
+
+- 2020.01.15
+  - Distributed implementation for Structure-from-Motion, which 
+    only relies on `rpclib` for Remote Procedure Call(RPC). The distributed
+    implementation follows the Map-Reduce architecture.
+
+- 2020.01.10
+  - Using Spectra for solving large scale eigenvalue problem in spectral 
+    clustering. The efficiency is highly improved than original eigenvalue
+    solver in Eigen.
+
+- 2019.11.26
+  - Normalized Cut for image clustering.
+  - Spectral Clustering for image clustering.
+  - Community detection for image clustering.
+  - Graph-based sub-reconstruction Merging algorithm.
+  - Fast view graph filtering algorithm.
+  - Rotation averaging algorithms: Nonlinear RA, Lagrange Dual RA.
+  - translation averaging algorithms: LUD (Not available currently).

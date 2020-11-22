@@ -39,8 +39,8 @@ COLMAP_ADD_SOURCES(
     correspondence_graph.h correspondence_graph.cc
     database.h database.cc
     database_cache.h database_cache.cc
+    database_info.h
     essential_matrix.h essential_matrix.cc
-    flat_pair_map.h
     gps.h gps.cc
     graph_cut.h graph_cut.cc
     homography_matrix.h homography_matrix.cc
@@ -54,14 +54,13 @@ COLMAP_ADD_SOURCES(
     projection.h projection.cc
     reconstruction.h reconstruction.cc
     reconstruction_manager.h reconstruction_manager.cc
-    # scene_clustering.h scene_clustering.cc
     similarity_transform.h similarity_transform.cc
     structure.h
-    track_selection.h track_selection.cpp
     track.h track.cc
+    track_builder.h track_builder.cpp
+    track_selection.h track_selection.cpp
     triangulation.h triangulation.cc
     undistortion.h undistortion.cc
-    union_find.h
     visibility_pyramid.h visibility_pyramid.cc
     warp.h warp.cc
 )
@@ -90,6 +89,7 @@ COLMAP_ADD_TEST(reconstruction_manager_test reconstruction_manager_test.cc)
 # COLMAP_ADD_TEST(scene_clustering_test scene_clustering_test.cc)
 COLMAP_ADD_TEST(similarity_transform_test similarity_transform_test.cc)
 COLMAP_ADD_TEST(track_test track_test.cc)
+COLMAP_ADD_TEST(track_builder_test track_builder_test.cpp)
 COLMAP_ADD_TEST(triangulation_test triangulation_test.cc)
 COLMAP_ADD_TEST(undistortion_test undistortion_test.cc)
 COLMAP_ADD_TEST(visibility_pyramid_test visibility_pyramid_test.cc)

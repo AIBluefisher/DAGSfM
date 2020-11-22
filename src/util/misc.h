@@ -32,12 +32,11 @@
 #ifndef COLMAP_SRC_UTIL_MISC_H_
 #define COLMAP_SRC_UTIL_MISC_H_
 
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include <boost/filesystem.hpp>
 
 #include "util/endian.h"
 #include "util/logging.h"

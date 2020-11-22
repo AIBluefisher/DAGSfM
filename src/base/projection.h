@@ -32,11 +32,10 @@
 #ifndef COLMAP_SRC_BASE_PROJECTION_H_
 #define COLMAP_SRC_BASE_PROJECTION_H_
 
-#include <limits>
-#include <vector>
-
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <limits>
+#include <vector>
 
 #include "base/camera.h"
 

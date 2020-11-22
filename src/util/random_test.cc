@@ -30,12 +30,12 @@
 // Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
 #define TEST_NAME "util/random"
-#include "util/testing.h"
+#include "util/random.h"
 
 #include <numeric>
 
 #include "util/math.h"
-#include "util/random.h"
+#include "util/testing.h"
 
 using namespace colmap;
 
