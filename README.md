@@ -2,13 +2,14 @@
 
 If you use this project for your research, please cite:
 ```
-@misc{chen2019graphbased,
-    title={Graph-Based Parallel Large Scale Structure from Motion},
-    author={Yu Chen and Shuhan Shen and Yisong Chen and Guoping Wang},
-    year={2019},
-    eprint={1912.10659},
-    archivePrefix={arXiv},
-    primaryClass={cs.CV}
+@article{article,
+  author = {Chen, Yu and Shen, Shuhan and Chen, Yisong and Wang, Guoping},
+  year = {2020},
+  month = {07},
+  pages = {107537},
+  title = {Graph-Based Parallel Large Scale Structure from Motion},
+  journal = {Pattern Recognition},
+  doi = {10.1016/j.patcog.2020.107537}
 }
 
 @inproceedings{schoenberger2016sfm,
