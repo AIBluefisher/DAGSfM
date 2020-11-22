@@ -48,14 +48,6 @@ sudo apt-get install \
     libcgal-qt5-dev
 ```
 
-#### Python Modules (Python 2.7 only)
-```sh
-sudo pip install scikit-learn tensorflow-gpu==1.7.0 scipy numpy progressbar2
-
-# if the version of scikit-learn is not compatible, upgrade it by:
-# pip install --upgrade scikit-learn
-```
-
 #### [ceres-solver]()
 
 ```sh
@@ -95,7 +87,17 @@ make -j8
 sudo make install
 ```
 
-### 2.2 Build DAGSfM
+### 2.2 Optional
+#### Python Modules (Python 2.7 only)
+This module is used for similarity seaching, while needs more evaluation.
+```sh
+sudo pip install scikit-learn tensorflow-gpu==1.7.0 scipy numpy progressbar2
+
+# if the version of scikit-learn is not compatible, upgrade it by:
+# pip install --upgrade scikit-learn
+```
+
+### 2.3 Build DAGSfM
 
 ```sh
 git clone https://github.com/AIBluefisher/DAGSfM.git
