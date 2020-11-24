@@ -40,6 +40,7 @@ $DATASET_PATH/$log_folder \
 --database_path=$DATASET_PATH/database.db \
 --image_path=$DATASET_PATH/images \
 --output_path=$DATASET_PATH/$log_folder \
+--vocab_tree_path=$DATASET_PATH \
 --config_file_name=$CONFIG_FILE_PATH/config.txt \
 --num_workers=8 \
 --distributed=0 \
