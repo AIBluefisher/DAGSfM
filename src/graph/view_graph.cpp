@@ -89,6 +89,8 @@ bool ViewGraph::AddTwoViewGeometry(const ImagePair& image_pair,
   }
 
   twoview_geometries_.emplace(image_pair, twoview_info);
+  image_pairs_.emplace_back(image_pair);
+  scores_.push_back(twoview_info.visibility_score);
 
   return true;
 }

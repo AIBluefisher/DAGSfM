@@ -51,31 +51,22 @@ namespace DAGSfM {
 
 using Edges = std::unordered_map<ImagePair, int>;
 struct ImageCluster {
-  int cluster_id;
+  int cluster_id = 0;
   std::vector<image_t> image_ids;
   Edges edges;
   bool is_condition_satisfy = false;
   bool completed = false;
 
-  // ImageCluster(const ImageCluster& image_cluster)
-  // {
-  //     for (auto image_id : image_cluster.image_ids) {
-  //         image_ids.push_back(image_id);
-  //     }
-  //     for (auto it : image_cluster.edges) {
-  //         edges[it.first] = it.second;
-  //     }
-  //     is_condition_satisfy = image_cluster.is_condition_satisfy;
-  // }
-
   void ShowInfo() const {
-    LOG(INFO) << image_ids.size() << " nodes";
-    for (auto image_id : image_ids) {
-      std::cout << image_id << " ";
-    }
-    std::cout << "\n";
+    std::string info = "Cluster " + std::to_string(cluster_id) + ": [";
+    info += ("node: " + std::to_string(image_ids.size()));
+    // for (auto image_id : image_ids) {
+    //   std::cout << image_id << " ";
+    // }
+    // std::cout << "\n";
 
-    LOG(INFO) << edges.size() << " edges";
+    info += (", edges: " + std::to_string(edges.size()) + "]");
+    LOG(INFO) << info;
   }
 };
 
@@ -152,11 +143,9 @@ class ImageClustering {
 
   std::vector<ImageCluster> BiCut(const ImageCluster& cluster);
 
-  std::vector<ImageCluster> GetIntraClusters() const;
-
-  std::vector<ImageCluster> GetInterClusters() const;
-
-  ImageCluster GetRootCluster() const;
+  const std::vector<ImageCluster>& GetIntraClusters() const;
+  const std::vector<ImageCluster>& GetInterClusters() const;
+  const ImageCluster& GetRootCluster() const;
 
   void OutputClusteringSummary() const;
 
@@ -176,7 +165,7 @@ class ImageClustering {
   std::vector<ImageCluster> inter_clusters_;
 
   // The discarded edges after image clustering
-  std::priority_queue<graph::Edge> discarded_edges_;
+  graph::LargerEdgePriorityQueue<graph::Edge> discarded_edges_;
   std::unordered_map<ImagePair, std::vector<graph::Edge>> clusters_lost_edges_;
 
   double AnalyzeDegree(const std::vector<std::pair<int, int>>& image_pairs,

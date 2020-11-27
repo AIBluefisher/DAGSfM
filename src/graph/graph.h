@@ -38,6 +38,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <unordered_set>
 
 namespace DAGSfM {
 namespace graph {
@@ -101,12 +102,29 @@ struct Edge {
     dst = edge.dst;
     weight = edge.weight;
   }
+};
 
-  // sort in descending order
-  friend bool operator<(const Edge& edge1, const Edge& edge2) {
+template <typename EdgeType>
+struct CmpAscent {
+  bool operator()(const EdgeType& edge1, const EdgeType& edge2) {
+    return edge1.weight > edge2.weight;
+  }
+};
+
+template <typename EdgeType>
+struct CmpDescent {
+  bool operator()(const EdgeType& edge1, const EdgeType& edge2) {
     return edge1.weight < edge2.weight;
   }
 };
+
+template <typename EdgeType>
+using LargerEdgePriorityQueue =
+std::priority_queue<EdgeType, std::vector<EdgeType>, CmpDescent<EdgeType>>;
+
+template <typename EdgeType>
+using SmallerEdgePriorityQueue =
+std::priority_queue<EdgeType, std::vector<EdgeType>, CmpAscent<EdgeType>>;
 
 // NodeType: type of node, EdgeType: type of edge
 template <typename NodeType, typename EdgeType>
@@ -140,7 +158,7 @@ class Graph {
   bool AddUEdge(const EdgeType& edge, const EdgeType& rev_edge);
   bool AlterEdge(const EdgeType& edge);
   bool DeleteEdge(const size_t& src, const size_t& dst);
-  std::priority_queue<EdgeType> CollectEdges() const;
+  SmallerEdgePriorityQueue<EdgeType> CollectEdges() const;
   EdgeType FindConnectedEdge(const int& idx) const;
 
   // graph size (equals to size of nodes)
@@ -169,11 +187,12 @@ class Graph {
   // graph information presentation
   void ShowInfo() const;
   void ShowInfo(const std::string& filename) const;
-  // void GraphVisual() const;
+  void OutputSVG(const std::string& filename) const;
 
   Graph<NodeType, EdgeType> ExtractLargestCC() const;
 
-  size_t FindConnectedComponents() const;
+  std::unordered_map<size_t, std::unordered_set<size_t>>
+  FindConnectedComponents() const;
 
   std::vector<NodeType> SerializeNodes() const;
   std::vector<EdgeMap> SerializeEdges() const;
@@ -182,7 +201,7 @@ class Graph {
   void UpdateGraph();
 
  private:
-  size_t _size;
+  size_t size_;
   std::unordered_map<size_t, NodeType> nodes_;
   std::unordered_map<size_t, EdgeMap> edges_;  // size_t: src
   // degree of nodes: node_id, degree

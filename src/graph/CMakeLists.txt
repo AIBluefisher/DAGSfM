@@ -1,10 +1,12 @@
 set(FOLDER_NAME "graph")
 
 COLMAP_ADD_SOURCES(
+    color_gradient.h
     graph_cut.h graph_cut.cpp
     graph.h graph.inl
-    image_graph.h
+    image_graph.h image_graph.cpp
     similarity_graph.h similarity_graph.cpp
+    svg_drawer.h
     view_graph.h view_graph.cpp
     union_find.h union_find.cpp
 )

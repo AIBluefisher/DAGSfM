@@ -51,8 +51,8 @@ class ImageGraph {
   inline const std::vector<image_t>& ImageIds() const;
   inline std::vector<image_t>& ImageIds();
 
-  inline const std::vector<std::pair<image_t, image_t>>& ImagePairs() const;
-  inline std::vector<std::pair<image_t, image_t>>& ImagePairs();
+  inline const std::vector<ImagePair>& ImagePairs() const;
+  inline std::vector<ImagePair>& ImagePairs();
 
   inline const std::vector<int>& Scores() const;
   inline std::vector<int>& Scores();
@@ -64,20 +64,22 @@ class ImageGraph {
   inline std::unordered_map<std::string, image_t>& ImageNameToId();
 
   inline bool AddImage(const image_t image_id, const std::string& image_name);
-  inline bool AddImagePair(const std::pair<image_t, image_t>& image_pair);
+  inline bool AddImagePair(const ImagePair& image_pair);
 
-  inline void ExtractLargestCC();
+  void ExtractLargestCC();
 
-  inline void GetImagePairsSubset(
+  void GetImagePairsSubset(
       const std::vector<image_t>& image_ids,
-      std::vector<std::pair<image_t, image_t>>& image_pairs);
-  inline void GetImagePairsSubset(
+      std::vector<ImagePair>& image_pairs);
+  void GetImagePairsSubset(
       const std::unordered_set<image_t>& image_ids,
-      std::vector<std::pair<image_t, image_t>>& image_pairs);
+      std::vector<ImagePair>& image_pairs);
+
+  void OutputSVG(const std::string& filename);
 
  protected:
   std::vector<image_t> image_ids_;
-  std::vector<std::pair<image_t, image_t>> image_pairs_;
+  std::vector<ImagePair> image_pairs_;
   std::vector<int> scores_;
   std::unordered_map<image_t, std::string> image_id_to_name_;
   std::unordered_map<std::string, image_t> image_name_to_id_;
@@ -89,12 +91,12 @@ inline const std::vector<image_t>& ImageGraph::ImageIds() const {
 
 inline std::vector<image_t>& ImageGraph::ImageIds() { return image_ids_; }
 
-inline const std::vector<std::pair<image_t, image_t>>& ImageGraph::ImagePairs()
+inline const std::vector<ImagePair>& ImageGraph::ImagePairs()
     const {
   return image_pairs_;
 }
 
-inline std::vector<std::pair<image_t, image_t>>& ImageGraph::ImagePairs() {
+inline std::vector<ImagePair>& ImageGraph::ImagePairs() {
   return image_pairs_;
 }
 
@@ -134,71 +136,9 @@ inline bool ImageGraph::AddImage(const image_t image_id,
 }
 
 inline bool ImageGraph::AddImagePair(
-    const std::pair<image_t, image_t>& image_pair) {
+    const ImagePair& image_pair) {
   image_pairs_.emplace_back(image_pair);
   return true;
-}
-
-inline void ImageGraph::ExtractLargestCC() {
-  graph::UnionFind uf(image_ids_.size());
-  std::vector<size_t> tmp_nodes(image_ids_.begin(), image_ids_.end());
-  uf.InitWithNodes(tmp_nodes);
-
-  for (auto image_pair : image_pairs_) {
-    uf.Union(image_pair.first, image_pair.second);
-  }
-
-  std::unordered_map<size_t, std::vector<image_t>> components;
-  for (auto image_id : image_ids_) {
-    const size_t parent_id = uf.FindRoot(image_id);
-    components[parent_id].push_back(image_id);
-  }
-
-  size_t num_largest_component = 0;
-  size_t largest_component_id;
-  for (const auto& it : components) {
-    if (num_largest_component < it.second.size()) {
-      num_largest_component = it.second.size();
-      largest_component_id = it.first;
-    }
-  }
-
-  image_ids_.clear();
-  image_ids_.assign(components[largest_component_id].begin(),
-                    components[largest_component_id].end());
-  image_ids_.shrink_to_fit();
-  std::sort(image_ids_.begin(), image_ids_.end());
-
-  LOG(INFO) << "There are " << components.size() << " connected components.";
-  int num_small_connected_components = 0;
-  for (auto component : components) {
-    if (component.second.size() < image_ids_.size()) {
-      num_small_connected_components++;
-    } else {
-      LOG(INFO) << "Component #" << component.first << "# has "
-                << component.second.size() << " images.";
-    }
-  }
-  LOG(INFO) << "There are " << num_small_connected_components
-            << " small connected components are discarded.";
-}
-
-inline void ImageGraph::GetImagePairsSubset(
-    const std::vector<image_t>& image_ids,
-    std::vector<std::pair<image_t, image_t>>& image_pairs) {
-  std::unordered_set<image_t> image_sets(image_ids.begin(), image_ids.end());
-  GetImagePairsSubset(image_sets, image_pairs);
-}
-
-inline void ImageGraph::GetImagePairsSubset(
-    const std::unordered_set<image_t>& image_ids,
-    std::vector<std::pair<image_t, image_t>>& image_pairs) {
-  for (auto image_pair : image_pairs_) {
-    if (image_ids.count(image_pair.first) > 0 &&
-        image_ids.count(image_pair.second) > 0) {
-      image_pairs.push_back(image_pair);
-    }
-  }
 }
 
 }  // namespace DAGSfM

@@ -82,8 +82,7 @@ void ImageClustering::Cut() {
   }
 
   LOG(INFO) << "Images Clustering Started ";
-  // const std::unique_ptr<Cluster> cluster = this->CreateCluster(image_pairs,
-  // weights);
+
   const std::unique_ptr<Cluster> cluster = this->CreateCluster();
   CHECK_NOTNULL(cluster.get());
   LOG(INFO) << "cluster num: " << num_clusters;
@@ -280,7 +279,7 @@ void ImageClustering::CutAndExpand() {
       // If there is no cluster satisfies completeness ratio constraint
       // we can jump out of the loop
       if (!IsRemainingClusters()) {
-        std::priority_queue<graph::Edge> empty_edges;
+        graph::LargerEdgePriorityQueue<graph::Edge> empty_edges;
         std::swap(empty_edges, discarded_edges_);
         break;
       }
@@ -331,15 +330,17 @@ void ImageClustering::CutAndExpand() {
   AnalyzeStatistic();
 }
 
-std::vector<ImageCluster> ImageClustering::GetIntraClusters() const {
+const std::vector<ImageCluster>& ImageClustering::GetIntraClusters() const {
   return intra_clusters_;
 }
 
-std::vector<ImageCluster> ImageClustering::GetInterClusters() const {
+const std::vector<ImageCluster>& ImageClustering::GetInterClusters() const {
   return inter_clusters_;
 }
 
-ImageCluster ImageClustering::GetRootCluster() const { return root_cluster_; }
+const ImageCluster& ImageClustering::GetRootCluster() const {
+  return root_cluster_;
+}
 
 double ImageClustering::AnalyzeDegree(
     const std::vector<std::pair<int, int>>& image_pairs,
@@ -428,7 +429,7 @@ bool ImageClustering::IsSatisfyCompletenessRatio(const ImageCluster& cluster) {
   const float repeated_ratio =
       (float)repeated_node_num / (float)(inter_clusters_[i].image_ids.size());
   if (repeated_ratio <= options_.completeness_ratio) {
-    VLOG(2) << "repeated ratio: " << repeated_ratio;
+    VLOG(4) << "repeated ratio: " << repeated_ratio;
     return false;
   } else {
     inter_clusters_[i].is_condition_satisfy = true;
@@ -460,7 +461,7 @@ int ImageClustering::ClusterSatisfyCompletenessRatio(const graph::Edge& edge) {
     const float repeated_ratio =
         (float)repeated_node_num / (float)(inter_clusters_[i].image_ids.size());
     if (repeated_ratio <= options_.completeness_ratio) {
-      VLOG(2) << "repeated ratio: " << repeated_ratio;
+      VLOG(4) << "repeated ratio: " << repeated_ratio;
       cluster_id = i;
       break;
     } else {
@@ -492,30 +493,30 @@ uint ImageClustering::CommonImagesNum(const ImageCluster& cluster1,
 
 void ImageClustering::OutputClusteringSummary() const {
   LOG(INFO)
-      << "Images Clustering Config:\n"
-      << "- image upperbound: " << options_.num_images_ub << "\n"
-      << "- completeness ratio: " << options_.completeness_ratio << "\n"
-      << "- cluster type: " << options_.cluster_type << "\n"
-      << "Images Clutering Summary:\n"
-      << "Clusters number: " << inter_clusters_.size() << "\n"
-      << "Total graph cutting time: " << summary_.total_cutting_time
+      << "#Images Clustering Config:#\n"
+      << "\t - image upperbound: " << options_.num_images_ub << "\n"
+      << "\t - completeness ratio: " << options_.completeness_ratio << "\n"
+      << "\t - cluster type: " << options_.cluster_type << "\n"
+      << "#Images Clustering Summary:#\n"
+      << "\t - Clusters number: " << inter_clusters_.size() << "\n"
+      << "\t - Total graph cutting time: " << summary_.total_cutting_time
       << " seconds\n"
-      << "Total graph cutting number: " << summary_.total_cutting_num << "\n"
-      << "Total graph expansion time: " << summary_.total_expansion_time
+      << "\t - Total graph cutting number: " << summary_.total_cutting_num << "\n"
+      << "\t - Total graph expansion time: " << summary_.total_expansion_time
       << " seconds\n"
-      << "Total graph expansion number: " << summary_.total_expansion_num
+      << "\t - Total graph expansion number: " << summary_.total_expansion_num
       << "\n"
-      << "Total time took: " << summary_.total_time << " seconds\n"
-      << "Total iteration number: " << summary_.total_iters_num << "\n"
-      << "Images number expanded from " << summary_.original_images_num
+      << "\t - Total time took: " << summary_.total_time << " seconds\n"
+      << "\t - Total iteration number: " << summary_.total_iters_num << "\n"
+      << "\t - Images number expanded from " << summary_.original_images_num
       << " to " << summary_.clustered_images_num << "\n"
-      << "Repeated Ratio: "
+      << "\t - Repeated Ratio: "
       << (float)(summary_.clustered_images_num - summary_.original_images_num) /
              (float)summary_.original_images_num
       << "\n"
-      << "Edges number reduced from " << summary_.original_edges_num << " to "
+      << "\t - Edges number reduced from " << summary_.original_edges_num << " to "
       << summary_.clustered_edges_num << "\n"
-      << "Lost ratio: "
+      << "\t - Lost ratio: "
       << (float)(summary_.original_edges_num - summary_.clustered_edges_num) /
              (float)summary_.original_edges_num;
 }

@@ -36,6 +36,7 @@
 
 #include "graph/graph.h"
 #include "graph/graph_cut.h"
+#include "graph/svg_drawer.h"
 #include "graph/union_find.h"
 
 namespace DAGSfM {
@@ -43,17 +44,18 @@ namespace graph {
 
 template <typename NodeType, typename EdgeType>
 Graph<NodeType, EdgeType>::Graph() {
-  _size = 0;
+  size_ = 0;
 }
 
 template <typename NodeType, typename EdgeType>
 Graph<NodeType, EdgeType>::Graph(size_t n) {
-  _size = n;
-  for (size_t i = 0; i < n; i++) degrees_[i] = 0;
+  size_ = n;
+  for (size_t i = 0; i < n; i++)
+    degrees_[i] = 0;
 }
 
 template <typename NodeType, typename EdgeType>
-Graph<NodeType, EdgeType>::Graph(const Graph<NodeType, EdgeType>& graph) {
+Graph<NodeType, EdgeType>::Graph(const Graph<NodeType, EdgeType> &graph) {
   std::unordered_map<size_t, NodeType> nodes = graph.GetNodes();
   std::unordered_map<size_t, EdgeMap> edges = graph.GetEdges();
 
@@ -70,7 +72,7 @@ Graph<NodeType, EdgeType>::Graph(const Graph<NodeType, EdgeType>& graph) {
 
 template <typename NodeType, typename EdgeType>
 Graph<NodeType, EdgeType> Graph<NodeType, EdgeType>::Clone() const {
-  Graph<NodeType, EdgeType> graph(this->_size);
+  Graph<NodeType, EdgeType> graph(this->size_);
 
   for (auto it = nodes_.begin(); it != nodes_.end(); ++it) {
     graph.AddNode(it->second);
@@ -86,12 +88,13 @@ Graph<NodeType, EdgeType> Graph<NodeType, EdgeType>::Clone() const {
 
 template <typename NodeType, typename EdgeType>
 NodeType Graph<NodeType, EdgeType>::GetNode(size_t idx) const {
-  if (!HasNode(idx)) return NodeType();
+  if (!HasNode(idx))
+    return NodeType();
   return nodes_.at(idx);
 }
 
 template <typename NodeType, typename EdgeType>
-const std::unordered_map<size_t, NodeType>&
+const std::unordered_map<size_t, NodeType> &
 Graph<NodeType, EdgeType>::GetNodes() const {
   return nodes_;
 }
@@ -102,25 +105,28 @@ size_t Graph<NodeType, EdgeType>::GetNodesNum() const {
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::HasNode(const size_t& idx) const {
-  if (nodes_.find(idx) == nodes_.end()) return false;
+bool Graph<NodeType, EdgeType>::HasNode(const size_t &idx) const {
+  if (nodes_.find(idx) == nodes_.end())
+    return false;
   return true;
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::AddNode(const NodeType& node) {
-  if (HasNode(node.id)) return false;
+bool Graph<NodeType, EdgeType>::AddNode(const NodeType &node) {
+  if (HasNode(node.id))
+    return false;
 
-  _size++;
-  // if (node.idx == -1) node.idx = _size;
+  size_++;
+  // if (node.idx == -1) node.idx = size_;
   nodes_[node.id] = node;
   return true;
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::DeleteNode(const size_t& idx) {
-  if (!HasNode(idx)) return false;
-  _size--;
+bool Graph<NodeType, EdgeType>::DeleteNode(const size_t &idx) {
+  if (!HasNode(idx))
+    return false;
+  size_--;
   nodes_.erase(idx);
   return true;
 }
@@ -152,14 +158,15 @@ std::vector<NodeType> Graph<NodeType, EdgeType>::FindSingletonNodes() {
 }
 
 template <typename NodeType, typename EdgeType>
-const std::unordered_map<size_t, std::unordered_map<size_t, EdgeType>>&
+const std::unordered_map<size_t, std::unordered_map<size_t, EdgeType>> &
 Graph<NodeType, EdgeType>::GetEdges() const {
   return edges_;
 }
 
 template <typename NodeType, typename EdgeType>
 EdgeType Graph<NodeType, EdgeType>::GetEdge(size_t src, size_t dst) const {
-  if (!HasEdge(src, dst)) return EdgeType();
+  if (!HasEdge(src, dst))
+    return EdgeType();
   return edges_.at(src).at(dst);
 }
 
@@ -176,20 +183,25 @@ size_t Graph<NodeType, EdgeType>::GetEdgesNum() const {
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::HasEdge(const size_t& src,
-                                        const size_t& dst) const {
+bool Graph<NodeType, EdgeType>::HasEdge(const size_t &src,
+                                        const size_t &dst) const {
   const auto em_ite = edges_.find(src);
-  if (em_ite == edges_.end()) return false;
+  if (em_ite == edges_.end())
+    return false;
   EdgeMap em = em_ite->second;
-  if (em.find(dst) == em.end()) return false;
+  if (em.find(dst) == em.end())
+    return false;
   return true;
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::AddEdge(const EdgeType& edge) {
-  if (HasEdge(edge.src, edge.dst)) return false;
-  if (!HasNode(edge.src)) this->AddNode(edge.src);
-  if (!HasNode(edge.dst)) this->AddNode(edge.dst);
+bool Graph<NodeType, EdgeType>::AddEdge(const EdgeType &edge) {
+  if (HasEdge(edge.src, edge.dst))
+    return false;
+  if (!HasNode(edge.src))
+    this->AddNode(edge.src);
+  if (!HasNode(edge.dst))
+    this->AddNode(edge.dst);
 
   auto em_ite = edges_.find(edge.src);
   if (em_ite == edges_.end()) {
@@ -202,32 +214,36 @@ bool Graph<NodeType, EdgeType>::AddEdge(const EdgeType& edge) {
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::AlterEdge(const EdgeType& edge) {
-  if (!HasEdge(edge.src, edge.dst)) return false;
-  if (!HasNode(edge.src) || !HasNode(edge.dst)) return false;
+bool Graph<NodeType, EdgeType>::AlterEdge(const EdgeType &edge) {
+  if (!HasEdge(edge.src, edge.dst))
+    return false;
+  if (!HasNode(edge.src) || !HasNode(edge.dst))
+    return false;
 
   edges_.at(edge.src).at(edge.dst) = edge;
   return true;
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::AddUEdge(const EdgeType& edge,
-                                         const EdgeType& rev_edge) {
+bool Graph<NodeType, EdgeType>::AddUEdge(const EdgeType &edge,
+                                         const EdgeType &rev_edge) {
   return this->AddEdge(edge) && this->AddEdge(rev_edge);
 }
 
 template <typename NodeType, typename EdgeType>
-bool Graph<NodeType, EdgeType>::DeleteEdge(const size_t& src,
-                                           const size_t& dst) {
-  if (!HasEdge(src, dst)) return false;
+bool Graph<NodeType, EdgeType>::DeleteEdge(const size_t &src,
+                                           const size_t &dst) {
+  if (!HasEdge(src, dst))
+    return false;
   auto em_ite = edges_.find(src);
   em_ite->second.erase(em_ite->second.find(dst));
-  if (edges_[src].empty()) edges_.erase(em_ite);
+  if (edges_[src].empty())
+    edges_.erase(em_ite);
   return true;
 }
 
 template <typename NodeType, typename EdgeType>
-EdgeType Graph<NodeType, EdgeType>::FindConnectedEdge(const int& idx) const {
+EdgeType Graph<NodeType, EdgeType>::FindConnectedEdge(const int &idx) const {
   EdgeType edge;
   for (auto it = edges_.begin(); it != edges_.end(); ++it) {
     auto em = it->second;
@@ -264,7 +280,7 @@ void Graph<NodeType, EdgeType>::CountDegrees() {
 }
 
 template <typename NodeType, typename EdgeType>
-const std::unordered_map<size_t, size_t>&
+const std::unordered_map<size_t, size_t> &
 Graph<NodeType, EdgeType>::GetDegrees() const {
   return degrees_;
 }
@@ -279,7 +295,7 @@ void Graph<NodeType, EdgeType>::CountOutDegrees() {
 }
 
 template <typename NodeType, typename EdgeType>
-const std::unordered_map<size_t, size_t>&
+const std::unordered_map<size_t, size_t> &
 Graph<NodeType, EdgeType>::GetOutDegrees() const {
   return out_degrees_;
 }
@@ -301,14 +317,14 @@ void Graph<NodeType, EdgeType>::CountInDegrees() {
 }
 
 template <typename NodeType, typename EdgeType>
-const std::unordered_map<size_t, size_t>&
+const std::unordered_map<size_t, size_t> &
 Graph<NodeType, EdgeType>::GetInDegrees() const {
   return out_degrees_;
 }
 
 template <typename NodeType, typename EdgeType>
 int Graph<NodeType, EdgeType>::FindLeafNode(
-    const std::unordered_map<size_t, size_t>& degrees) const {
+    const std::unordered_map<size_t, size_t> &degrees) const {
   // Finding nodes with degree equals 1
   int idx = -1;
   for (auto ite = degrees.begin(); ite != degrees.end(); ++ite) {
@@ -323,7 +339,7 @@ int Graph<NodeType, EdgeType>::FindLeafNode(
 template <typename NodeType, typename EdgeType>
 std::vector<EdgeType> Graph<NodeType, EdgeType>::Kruskal() const {
   std::vector<EdgeType> mstedges_;
-  std::priority_queue<EdgeType> edges = this->CollectEdges();
+  SmallerEdgePriorityQueue<EdgeType> edges = this->CollectEdges();
 
   std::vector<size_t> nodes;
   nodes.reserve(nodes_.size());
@@ -348,8 +364,9 @@ std::vector<EdgeType> Graph<NodeType, EdgeType>::Kruskal() const {
 }
 
 template <typename NodeType, typename EdgeType>
-std::vector<EdgeType> Graph<NodeType, EdgeType>::ShortestPath(
-    const size_t& src, const size_t& dst) const {
+std::vector<EdgeType>
+Graph<NodeType, EdgeType>::ShortestPath(const size_t &src,
+                                        const size_t &dst) const {
   std::vector<EdgeType> paths;
   std::queue<size_t> qu;
   std::unordered_map<size_t, int> parents;
@@ -375,7 +392,7 @@ std::vector<EdgeType> Graph<NodeType, EdgeType>::ShortestPath(
   while (!qu.empty()) {
     size_t cur_id = qu.front();
     qu.pop();
-    if (cur_id == dst) {  // arrive destination
+    if (cur_id == dst) { // arrive destination
       int id = cur_id;
       std::cout << "Shortest Path(BFS): " << id << "->";
       while (parents[id] != -1) {
@@ -404,8 +421,8 @@ std::vector<EdgeType> Graph<NodeType, EdgeType>::ShortestPath(
 }
 
 template <typename NodeType, typename EdgeType>
-std::unordered_map<int, int> Graph<NodeType, EdgeType>::NormalizedCut(
-    const size_t cluster_num) const {
+std::unordered_map<int, int>
+Graph<NodeType, EdgeType>::NormalizedCut(const size_t cluster_num) const {
   std::vector<std::pair<int, int>> edges;
   std::vector<int> weights;
 
@@ -435,7 +452,8 @@ void Graph<NodeType, EdgeType>::ShowInfo() const {
   LOG(INFO) << "\n[Edge]: \n";
   for (auto it = edges_.begin(); it != edges_.end(); ++it) {
     auto em = it->second;
-    if (em.size() == 0) continue;
+    if (em.size() == 0)
+      continue;
     for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
       std::cout << "(" << em_it->second.src << ", " << em_it->second.dst
                 << ") ";
@@ -453,7 +471,7 @@ void Graph<NodeType, EdgeType>::ShowInfo() const {
 }
 
 template <typename NodeType, typename EdgeType>
-void Graph<NodeType, EdgeType>::ShowInfo(const std::string& filename) const {
+void Graph<NodeType, EdgeType>::ShowInfo(const std::string &filename) const {
   std::ofstream out(filename);
   if (!out.is_open()) {
     std::cout << filename << " cannot be opened!\n";
@@ -475,7 +493,8 @@ void Graph<NodeType, EdgeType>::ShowInfo(const std::string& filename) const {
   out << "\n[Edge]: \n";
   for (auto it = edges_.begin(); it != edges_.end(); ++it) {
     auto em = it->second;
-    if (em.size() == 0) continue;
+    if (em.size() == 0)
+      continue;
     for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
       out << "(" << em_it->second.src << ", " << em_it->second.dst << ") ";
     }
@@ -516,7 +535,7 @@ Graph<NodeType, EdgeType> Graph<NodeType, EdgeType>::ExtractLargestCC() const {
 
   size_t num_largest_component = 0;
   size_t largest_component_id;
-  for (const auto& it : components) {
+  for (const auto &it : components) {
     if (num_largest_component < it.second.size()) {
       num_largest_component = it.second.size();
       largest_component_id = it.first;
@@ -539,41 +558,37 @@ Graph<NodeType, EdgeType> Graph<NodeType, EdgeType>::ExtractLargestCC() const {
 }
 
 template <typename NodeType, typename EdgeType>
-size_t Graph<NodeType, EdgeType>::FindConnectedComponents() const {
-  std::unordered_map<size_t, bool> visited;
-  std::queue<size_t> qu;
-  int connected_num = 0;
+std::unordered_map<size_t, std::unordered_set<size_t>>
+Graph<NodeType, EdgeType>::FindConnectedComponents() const {
+  graph::UnionFind uf(nodes_.size());
 
-  auto edges = this->SerializeEdges();
-
-  for (auto it = nodes_.begin(); it != nodes_.end(); ++it) {
-    visited[it->second.id] = false;
+  std::vector<size_t> node_ids;
+  node_ids.reserve(nodes_.size());
+  for (auto node_it : nodes_) {
+    node_ids.push_back(node_it.first);
   }
+  uf.InitWithNodes(node_ids);
 
-  for (auto node_it = nodes_.begin(); node_it != nodes_.end(); ++node_it) {
-    if (!visited[(node_it->second).id]) {
-      connected_num++;
-      visited[(node_it->second).id] = true;
-      qu.push((node_it->second).id);
-      while (!qu.empty()) {
-        size_t id = qu.front();
-        qu.pop();
-        EdgeMap em = edges[id];
-        for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
-          if (!visited[em_it->first]) {
-            visited[em_it->first] = true;
-            qu.push(em_it->first);
-          }
-        }
-      }
+  for (auto it = edges_.begin(); it != edges_.end(); ++it) {
+    auto em = it->second;
+    for (auto em_it = em.begin(); em_it != em.end(); ++em_it) {
+      uf.Union(em_it->second.src, em_it->second.dst);
     }
   }
-  return connected_num;
+
+  std::unordered_map<size_t, std::unordered_set<size_t>> components;
+  for (auto node_id : node_ids) {
+    const size_t parent_id = uf.FindRoot(node_id);
+    components[parent_id].insert(node_id);
+  }
+
+  return components;
 }
 
 template <typename NodeType, typename EdgeType>
-std::priority_queue<EdgeType> Graph<NodeType, EdgeType>::CollectEdges() const {
-  std::priority_queue<EdgeType> edges;
+SmallerEdgePriorityQueue<EdgeType>
+Graph<NodeType, EdgeType>::CollectEdges() const {
+  SmallerEdgePriorityQueue<EdgeType> edges;
   for (auto ite = edges_.begin(); ite != edges_.end(); ++ite) {
     EdgeMap em = ite->second;
     for (auto edge_ite = em.begin(); edge_ite != em.end(); ++edge_ite) {
@@ -621,12 +636,12 @@ void Graph<NodeType, EdgeType>::UpdateGraph() {
   }
 
   // adjust the id and index of edges
-  for (auto& it = edges_.begin(); it != edges_.end(); ++it) {
+  for (auto &it = edges_.begin(); it != edges_.end(); ++it) {
     size_t src = it->first;
-    EdgeMap& em = it->second;
-    for (auto& em_it = em.begin(); em_it != em.end(); ++em_it) {
+    EdgeMap &em = it->second;
+    for (auto &em_it = em.begin(); em_it != em.end(); ++em_it) {
       size_t dst = em_it->first;
-      EdgeType& edge = em_it->second;
+      EdgeType &edge = em_it->second;
       edge.src = nodes_[src].id;
       edge.dst = nodes_[dst].id;
       em_it->first = nodes_[dst].id;
@@ -642,5 +657,64 @@ void Graph<NodeType, EdgeType>::UpdateGraph() {
   }
 }
 
-}  // namespace graph
-}  // namespace DAGSfM
+template <typename NodeType, typename EdgeType>
+void Graph<NodeType, EdgeType>::OutputSVG(const std::string &filename) const {
+  const float scale_factor = 5.0f;
+  const size_t image_num = nodes_.size();
+
+  SvgDrawer svg_drawer((image_num + 3) * 5, (image_num + 3) * 5);
+
+  // Draw rectangles for all image pairs.
+  for (const auto &it : edges_) {
+    const size_t i = it.first;
+    const EdgeMap &em = it.second;
+
+    for (auto &em_it : em) {
+      const size_t j = em_it.first;
+      const float score = em_it.second.weight;
+
+      std::ostringstream os_color;
+      os_color << "rgb(" << 0 << "," << 0 << "," << 255 << ")";
+
+      std::ostringstream os_tooltip;
+      os_tooltip << "(" << j << "," << i << " " << score << ")";
+      svg_drawer.DrawSquare(
+          j * scale_factor, i * scale_factor, scale_factor / 2.0f,
+          SvgStyle().Fill(os_color.str()).NoStroke().ToolTip(os_tooltip.str()));
+
+      os_tooltip.clear();
+      os_tooltip << "(" << i << "," << j << " " << score << ")";
+      svg_drawer.DrawSquare(
+          i * scale_factor, j * scale_factor, scale_factor / 2.0f,
+          SvgStyle().Fill(os_color.str()).NoStroke().ToolTip(os_tooltip.str()));
+    }
+  }
+
+  // Display axes with 0-> image_num annotation
+  std::ostringstream os_num_images;
+  os_num_images << image_num;
+  svg_drawer.DrawText((image_num + 1) * scale_factor, scale_factor,
+                      scale_factor, "0", "black");
+  svg_drawer.DrawText((image_num + 1) * scale_factor,
+                      (image_num - 1) * scale_factor, scale_factor,
+                      os_num_images.str(), "black");
+  svg_drawer.DrawLine((image_num + 1) * scale_factor, 2 * scale_factor,
+                      (image_num + 1) * scale_factor,
+                      (image_num - 2) * scale_factor,
+                      SvgStyle().Stroke("black", 1.0));
+  svg_drawer.DrawText(scale_factor, (image_num + 1) * scale_factor,
+                      scale_factor, "0", "black");
+  svg_drawer.DrawText((image_num - 1) * scale_factor,
+                      (image_num + 1) * scale_factor, scale_factor,
+                      os_num_images.str(), "black");
+  svg_drawer.DrawLine(2 * scale_factor, (image_num + 1) * scale_factor,
+                      (image_num - 2) * scale_factor,
+                      (image_num + 1) * scale_factor,
+                      SvgStyle().Stroke("black", 1.0));
+
+  std::ofstream svg_ofs(filename);
+  svg_ofs << svg_drawer.CloseSvgFile().str();
+}
+
+} // namespace graph
+} // namespace DAGSfM

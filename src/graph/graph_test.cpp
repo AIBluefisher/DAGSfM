@@ -413,7 +413,7 @@ TEST(UNDIRECTED_GRAPH_TEST, TEST_FINDCONNECTEDCOMPONENTS) {
     graph.AddEdge(Edge(e.second, e.first));
   }
 
-  size_t cc_num = graph.FindConnectedComponents();
+  size_t cc_num = graph.FindConnectedComponents().size();
   EXPECT_EQ(cc_num, 1);
 
   graph.AddUEdge(Edge(1, 8), Edge(8, 1));
@@ -425,7 +425,7 @@ TEST(UNDIRECTED_GRAPH_TEST, TEST_FINDCONNECTEDCOMPONENTS) {
   graph.AddUEdge(Edge(9, 11), Edge(11, 9));
   graph.AddUEdge(Edge(10, 11), Edge(11, 10));
 
-  cc_num = graph.FindConnectedComponents();
+  cc_num = graph.FindConnectedComponents().size();
   EXPECT_EQ(cc_num, 1);
 
   graph.DeleteEdge(1, 8);
@@ -433,10 +433,6 @@ TEST(UNDIRECTED_GRAPH_TEST, TEST_FINDCONNECTEDCOMPONENTS) {
   graph.DeleteEdge(7, 8);
   graph.DeleteEdge(8, 7);
 
-  cc_num = graph.FindConnectedComponents();
+  cc_num = graph.FindConnectedComponents().size();
   EXPECT_EQ(cc_num, 2);
-}
-
-TEST(UNDIRECTED_GRAPH_TEST, TEST_UPDATEGRAPH) {
-  // TODO:
 }
