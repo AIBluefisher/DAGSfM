@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <vector>
 
 namespace colmap {
 

@@ -1,12 +1,14 @@
 # sudo pip3 install igraph
 
 import igraph
+import sys
 from PIL import Image
 
-filePath = '/home/chenyu/Projects/distributed_colmap/build/gml.txt'
-imagePath = '/home/chenyu/Projects/distributed_colmap/build/graph_image.png'
-# label_list = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-label_file = '/home/chenyu/Projects/distributed_colmap/build/labels.txt'
+graph_dir = sys.argv[1]
+
+file_path = graph_dir + '/gml.txt'
+label_file = graph_dir + '/labels.txt'
+image_path = graph_dir + '/graph_image.png'
 
 def getValue(value):
     colorList = ['blue','green','purple','yellow','red','pink','orange','black','white','gray','brown','wheat', 
@@ -14,30 +16,29 @@ def getValue(value):
 
     return colorList[int(value)]
 
-def drawIGraph(filePath, imagePath):
-    g = igraph.Graph.Read_GML(filePath)
+def drawIGraph(file_path, image_path):
+    g = igraph.Graph.Read_GML(file_path)
     g.vs['label'] = ['']
 
-    # image = igraph.plot(g, **visual_style)
-    igraph.plot(g, imagePath)
+    igraph.plot(g, image_path)
 
-def drawIGraphWithLabel(filePath, imagePath, label_list):
-    g = igraph.Graph.Read_GML(filePath)
+def drawIGraphWithLabel(file_path, image_path, label_list):
+    g = igraph.Graph.Read_GML(file_path)
     g.vs['label'] = ['']
 
     visual_style = dict()
     visual_style['vertex_color'] = list(map(getValue, label_list))
 
-    igraph.plot(g, imagePath, **visual_style)
+    igraph.plot(g, image_path, **visual_style)
     # image = igraph.plot(g, **visual_style)
-    # image.save(imagePath)
+    # image.save(image_path)
 
-def drawIGraphWithLabelFile(filePath, imagePath, label_file):
+def drawIGraphWithLabelFile(file_path, image_path, label_file):
     f = open(label_file)
     s = f.read()
     label_list = s.split()
     # print(label_list)
     
-    drawIGraphWithLabel(filePath, imagePath, label_list)
+    drawIGraphWithLabel(file_path, image_path, label_list)
 
-drawIGraphWithLabelFile(filePath, imagePath, label_file)
+drawIGraphWithLabelFile(file_path, image_path, label_file)
