@@ -125,7 +125,7 @@ sudo chmod +x scripts/shell/distributed_sfm.sh
 (1) At first, we need to establish the server for every worker: 
 ```sh
 cd build/src/exe
-./colmap local_sfm_worker --output_path=$output_path
+./colmap local_sfm_worker --output_path=$output_path --port=$your_port
 ```
 
 (2) Then, the ip and port for every server should be written in a `config.txt` file.
@@ -241,6 +241,14 @@ limit the image number of each small map, and use this parameter to segment larg
 - 'write_binary`: set to `1`  if save colmap data in binary format, or set to  `0`  to save colmap data in text format.
 
 ## ChangeLog
+
+- 2020.12.05
+  - OpenMP for DAGSfM when running in sequential mode. This can be faster as one partition
+    always cannot have an 100% CPU occupation (usually 40% ~ 60%). And the acceleration
+    depends on the hardware and datasets scale.
+  - Lazy initialization of RPC server, user should given the port number in their command.
+    Server would not listen on a port when running in sequential mode, so as to avoid crash
+    when viewing models in GUI.
 
 - 2020.06.24
   - Refactor distributed SfM and distributed matching in a consistent architecture.
