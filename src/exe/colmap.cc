@@ -923,10 +923,12 @@ int RunLocalSfMWorker(int argc, char** argv) {
   std::string input_path;
   std::string output_path;
   std::string image_list_path;
+  uint16_t port = 8080;
   // FLAGS_log_dir = argv[1];
 
   OptionManager options;
   options.AddRequiredOption("output_path", &output_path);
+  options.AddDefaultOption("port", &port);
   options.AddMapperOptions();
   options.Parse(argc, argv);
 
@@ -941,13 +943,23 @@ int RunLocalSfMWorker(int argc, char** argv) {
   ReconstructionManager reconstruction_manager;
   IncrementalMapperController mapper(options.mapper.get(),
                                      &reconstruction_manager);
-  rpc::server& srv = mapper.Server();
+  mapper.BindServer(port);
+  mapper.BindMapperFuncs();
+
+  rpc::server* srv = mapper.Server();
+  if (srv == nullptr) {
+    LOG(ERROR) << "Binding Server to SfM Worker Failed!";
+    return 0;
+  } else {
+    LOG(INFO) << "Server Listening on port " << port;
+  }
+
   bool exit = false;
   bool working = false;
 
-  srv.bind("RunMatching", [&](const std::vector<std::string>& image_list,
-                              std::vector<ImageNamePair>& image_pairs,
-                              const size_t job_id) {
+  srv->bind("RunMatching", [&](const std::vector<std::string>& image_list,
+                               std::vector<ImageNamePair>& image_pairs,
+                               const size_t job_id) {
     LOG(INFO) << "Running Local Matching of job " << job_id;
     // mapper.SetDatabaseCache(&database_cache);
     const std::string database_path =
@@ -969,7 +981,7 @@ int RunLocalSfMWorker(int argc, char** argv) {
     working = false;
   });
 
-  srv.bind("RunSfM", [&](DatabaseCache& database_cache) {
+  srv->bind("RunSfM", [&](DatabaseCache& database_cache) {
     LOG(INFO) << "Running Local SfM";
     mapper.SetDatabaseCache(&database_cache);
     // mapper.RunSfM();
@@ -979,9 +991,9 @@ int RunLocalSfMWorker(int argc, char** argv) {
     working = false;
   });
 
-  srv.bind("Exit", [&]() { exit = true; });
+  srv->bind("Exit", [&]() { exit = true; });
 
-  srv.async_run(2);
+  srv->async_run(2);
 
   while (!exit) {
     if (!working) {

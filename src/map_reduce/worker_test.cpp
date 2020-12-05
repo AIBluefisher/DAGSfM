@@ -49,21 +49,22 @@ int main() {
   size_t reg_image_num = 0;
 
   sfm_worker.SetTotalImageNum(total_image_num);
+  sfm_worker.BindServer();
+  sfm_worker.BindSfMBaseFuncs();
   // sfm_worker.SetIP("localhost");
 
-  rpc::server& server = sfm_worker.Server();
-  // rpc::server server(8080);
+  rpc::server* server = sfm_worker.Server();
   bool exit = false;
 
-  server.bind("HelloWorld", []() { std::cout << "Hello World!\n\n"; });
+  server->bind("HelloWorld", []() { std::cout << "Hello World!\n\n"; });
 
-  server.bind("Exit", [&]() {
+  server->bind("Exit", [&]() {
     LOG(INFO) << "Exit";
     rpc::this_session().post_exit();
     exit = true;
   });
 
-  server.async_run(2);
+  server->async_run(2);
 
   // while (!exit) {
   //   // do nothing.

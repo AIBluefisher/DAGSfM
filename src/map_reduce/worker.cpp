@@ -38,19 +38,24 @@
 
 namespace DAGSfM {
 
-uint16_t Worker::kRPCDefaultPort = 8080;
+// uint16_t Worker::kRPCDefaultPort = 8080;
 
-SfMWorker::SfMWorker() : Worker() {
-  server_.bind("ResetWorkerInfo", [this]() { info_.Reset(); });
+SfMWorker::SfMWorker() : Worker() {}
 
-  server_.bind("GetRunningInfo", [this]() { return info_; });
+bool SfMWorker::BindSfMBaseFuncs() {
+  if (server_ == nullptr) {
+    return false;
+  }
 
-  server_.bind("SetNonIdle", [this]() { this->SetIdle(false); });
+  server_->bind("ResetWorkerInfo", [this]() { info_.Reset(); });
+  server_->bind("GetRunningInfo", [this]() { return info_; });
+  server_->bind("SetNonIdle", [this]() { this->SetIdle(false); });
+  server_->bind("Stop", []() { rpc::this_server().stop(); });
 
-  server_.bind("Stop", []() { rpc::this_server().stop(); });
+  return true;
 }
 
-rpc::server& SfMWorker::Server() { return server_; }
+rpc::server* SfMWorker::Server() { return server_.get(); }
 
 const SfMRunningInfo SfMWorker::GetRunningInfo() const { return info_; }
 

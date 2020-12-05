@@ -164,7 +164,7 @@ void DistributedMapperController::Run() {
   //////////////////////////////////////////////////////////////////
   PrintHeading1("Partitioning the Scene...");
   timer.Start();
-  inter_clusters_ = ClusteringScenes();
+  ClusteringScenes();
   timer.Pause();
   cluster_time = timer.ElapsedSeconds();
 
@@ -203,7 +203,7 @@ void DistributedMapperController::Run() {
     ba_time = timer.ElapsedSeconds();
   }
 
-  LOG(INFO) << "Time elapsed: "
+  LOG(INFO) << "Time elapsed: \n"
             << "  -[image indexing]: " << indexing_time << " seconds.\n"
             << "  -[extraction + matching]: " << matching_time << " seconds.\n"
             << "  -[Rotation Averaging]: " << ra_time << " seconds.\n"
@@ -219,11 +219,9 @@ bool DistributedMapperController::SequentialSfM() {
   //// 1. Reconstruct all clusters in sequential manner //
   ////////////////////////////////////////////////////////
   PrintHeading1("Reconstructing Clusters...");
-  std::unordered_map<const ImageCluster*, ReconstructionManager>
-      reconstruction_managers;
+  std::unordered_map<size_t, ReconstructionManager> reconstruction_managers;
   std::vector<Reconstruction*> reconstructions;
-  ReconstructPartitions(inter_clusters_, reconstruction_managers,
-                        reconstructions);
+  ReconstructPartitions(reconstruction_managers, reconstructions);
 
   //////////////////////////////////////////////////
   //// 2. Merge clusters ///////////////////////////
@@ -605,7 +603,7 @@ bool DistributedMapperController::LoadTwoviewGeometries() {
   return view_graph_.TwoViewGeometries().size() > 0;
 }
 
-std::vector<ImageCluster> DistributedMapperController::ClusteringScenes() {
+void DistributedMapperController::ClusteringScenes() {
   // Clustering images
   ImageCluster image_cluster;
   image_cluster.image_ids = view_graph_.ImageIds();
@@ -623,48 +621,27 @@ std::vector<ImageCluster> DistributedMapperController::ClusteringScenes() {
   image_clustering_->Expand();
   image_clustering_->OutputClusteringSummary();
 
-  std::vector<ImageCluster> inter_clusters =
-      image_clustering_->GetInterClusters();
-  for (auto cluster : inter_clusters) {
+  inter_clusters_ = image_clustering_->GetInterClusters();
+  intra_clusters_ = image_clustering_->GetIntraClusters();
+  for (auto cluster : inter_clusters_) {
     cluster.ShowInfo();
   }
-
-  return inter_clusters;
 }
 
 void DistributedMapperController::ReconstructPartitions(
-    std::vector<ImageCluster>& inter_clusters,
-    std::unordered_map<const ImageCluster*, ReconstructionManager>&
-        reconstruction_managers,
+    std::unordered_map<size_t, ReconstructionManager>& reconstruction_managers,
     std::vector<Reconstruction*>& reconstructions) {
   // Determine the number of workers and threads per worker
   const int kMaxNumThreads = -1;
   const int num_eff_threads = GetEffectiveNumThreads(kMaxNumThreads);
   const std::unordered_map<image_t, std::string>& image_id_to_name =
       view_graph_.ImageIdToName();
-
-  // Function to reconstruct one cluster using incremental mapping.
-  // TODO: using different kind of mappers to reconstruct, such as global,
-  // hybrid
-  auto ReconstructCluster = [&, this](
-                                const ImageCluster& cluster,
-                                ReconstructionManager* reconstruction_manager) {
-    IncrementalMapperOptions custom_options = mapper_options_;
-    custom_options.max_model_overlap = 20;
-    custom_options.init_num_trials = options_.init_num_trials;
-    custom_options.num_threads = num_eff_threads;
-    custom_options.extract_colors = true;
-
-    for (const auto image_id : cluster.image_ids) {
-      custom_options.image_names.insert(image_id_to_name.at(image_id));
-    }
-
-    IncrementalMapperController mapper(&custom_options, options_.image_path,
-                                       options_.database_path,
-                                       reconstruction_manager);
-    mapper.Start();
-    mapper.Wait();
-  };
+  const int kDefaultNumWorkers = 8;
+  const int num_eff_workers =
+      std::min(static_cast<int>(inter_clusters_.size()),
+               std::min(kDefaultNumWorkers, num_eff_threads));
+  const int num_threads_per_worker =
+      std::max(1, num_eff_threads / num_eff_workers);
 
   // Start reconstructing the bigger clusters first for resource usage.
   const auto cmp = [](const ImageCluster& cluster1,
@@ -676,34 +653,62 @@ void DistributedMapperController::ReconstructPartitions(
   // Start the reconstruction workers.
   reconstruction_managers.reserve(inter_clusters_.size());
 
-  bool is_recons_exist = IsPartialReconsExist(reconstructions);
-  if (is_recons_exist) {
-    LOG(INFO) << "Loaded from previous reconstruction partitions.";
-  } else {
-    // #pragma omp parallel for
-    for (size_t k = 0; k < inter_clusters_.size(); k++) {
-      const auto& cluster = inter_clusters[k];
-      std::thread local_sfm_thread(ReconstructCluster, cluster,
-                                   &reconstruction_managers[&cluster]);
-      local_sfm_thread.join();
+  std::unordered_map<size_t, DatabaseCache> cluster_database_caches;
+  cluster_database_caches.reserve(inter_clusters_.size());
+
+  IncrementalMapperOptions local_mapper_options;
+  for (size_t k = 0; k < inter_clusters_.size(); k++) {
+    std::vector<std::string> image_name_list;
+    image_name_list.reserve(inter_clusters_[k].image_ids.size());
+
+    for (const auto image_id : inter_clusters_[k].image_ids) {
+      image_name_list.push_back(image_id_to_name.at(image_id));
+    }
+    std::sort(image_name_list.begin(), image_name_list.end());
+
+    std::unordered_set<std::string> image_name_set(image_name_list.begin(),
+                                                   image_name_list.end());
+    cluster_database_caches[k].Load(
+        database_, static_cast<size_t>(local_mapper_options.min_num_matches),
+        local_mapper_options.ignore_watermarks, image_name_set);
+  }
+
+#pragma omp parallel for
+  for (size_t k = 0; k < inter_clusters_.size(); k++) {
+    const auto& cluster = inter_clusters_[k];
+
+    IncrementalMapperOptions custom_options = mapper_options_;
+    custom_options.max_model_overlap = 20;
+    custom_options.init_num_trials = options_.init_num_trials;
+    custom_options.num_threads = num_threads_per_worker;
+    custom_options.extract_colors = true;
+
+    for (const auto image_id : cluster.image_ids) {
+      custom_options.image_names.insert(image_id_to_name.at(image_id));
     }
 
-    for (const auto& cluster : inter_clusters) {
-      auto& recon_manager = reconstruction_managers.at(&cluster);
-      for (size_t i = 0; i < recon_manager.Size(); i++) {
-        reconstructions.push_back(&recon_manager.Get(i));
-      }
-    }
-#ifdef __DEBUG__
-    LOG(INFO) << "Extracting colors for local maps.";
-    for (Reconstruction* reconstruction : reconstructions) {
-      ExtractColors(options_.image_path, reconstruction);
-    }
-    ExportUntransformedLocalRecons(reconstructions);
-    LOG(INFO) << "Local reconstructions are exported to "
-              << options_.output_path;
-#endif
+    IncrementalMapperController mapper(&custom_options,
+                                       &reconstruction_managers[k]);
+    mapper.SetDatabaseCache(&cluster_database_caches[k]);
+
+    mapper.Start();
+    mapper.Wait();
   }
+
+  for (size_t k = 0; k < inter_clusters_.size(); k++) {
+    auto& recon_manager = reconstruction_managers.at(k);
+    for (size_t i = 0; i < recon_manager.Size(); i++) {
+      reconstructions.push_back(&recon_manager.Get(i));
+    }
+  }
+#ifdef __DEBUG__
+  LOG(INFO) << "Extracting colors for local maps.";
+  for (Reconstruction* reconstruction : reconstructions) {
+    ExtractColors(options_.image_path, reconstruction);
+  }
+  ExportUntransformedLocalRecons(reconstructions);
+  LOG(INFO) << "Local reconstructions are exported to " << options_.output_path;
+#endif
 }
 
 void DistributedMapperController::MergeClusters(
@@ -748,11 +753,9 @@ void DistributedMapperController::MergeClusters(
   }
 
   // Assign cluster id for each image.
-  const std::vector<ImageCluster> intra_clusters =
-      image_clustering_->GetIntraClusters();
-  for (size_t i = 0; i < intra_clusters.size(); i++) {
-    const ImageCluster intra_cluster = intra_clusters[i];
-    const std::vector<image_t> image_ids = intra_cluster.image_ids;
+  for (size_t i = 0; i < intra_clusters_.size(); i++) {
+    const ImageCluster& intra_cluster = intra_clusters_[i];
+    const std::vector<image_t>& image_ids = intra_cluster.image_ids;
 
     for (auto image_id : image_ids) {
       if (reconstructions[anchor_node.id]->ExistsImage(image_id)) {
@@ -765,8 +768,7 @@ void DistributedMapperController::MergeClusters(
 
 void DistributedMapperController::MergeClusters(
     std::vector<Reconstruction*>& reconstructions,
-    std::unordered_map<const ImageCluster*, ReconstructionManager>&
-        reconstruction_managers,
+    std::unordered_map<size_t, ReconstructionManager>& reconstruction_managers,
     const int num_eff_threads) {
   LOG(INFO) << "Sub-reconstructions size: " << reconstructions.size();
   Node anchor_node;
@@ -776,15 +778,15 @@ void DistributedMapperController::MergeClusters(
   // reconstructions[anchor_node.id]->ShowReconInfo();
 
   // Insert a new reconstruction manager for merged cluster.
-  const ImageCluster root_cluster = image_clustering_->GetRootCluster();
-  auto& reconstruction_manager = reconstruction_managers[&root_cluster];
+  const size_t k = reconstruction_managers.size();
+  auto& reconstruction_manager = reconstruction_managers[k];
   reconstruction_manager.Add();
   reconstruction_manager.Get(reconstruction_manager.Size() - 1) =
       *reconstructions[anchor_node.id];
 
   LOG(INFO) << "Erasing clusters...";
-  for (const ImageCluster& inter_cluster : inter_clusters_) {
-    reconstruction_managers.erase(&inter_cluster);
+  for (size_t i = 0; i < k; i++) {
+    reconstruction_managers.erase(i);
   }
   CHECK_EQ(reconstruction_managers.size(), 1);
   *reconstruction_manager_ = std::move(reconstruction_managers.begin()->second);

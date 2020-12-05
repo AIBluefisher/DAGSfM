@@ -184,8 +184,7 @@ class IncrementalMapperController : public Thread, public SfMWorker {
   void SetImageList(const std::vector<std::string>& image_list);
   void SetImagePairs(const std::vector<ImageNamePair>& image_pairs);
 
-  // void SetGlobalImageNameToId(
-  //     const std::unordered_map<std::string, image_t>& image_name_to_id);
+  bool BindMapperFuncs();
 
   void RunSfM();
 

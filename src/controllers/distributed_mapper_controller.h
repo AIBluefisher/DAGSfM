@@ -171,22 +171,19 @@ class DistributedMapperController : public Thread {
   void LoadImages();
   bool LoadTwoviewGeometries();
 
-  std::vector<ImageCluster> ClusteringScenes();
+  void ClusteringScenes();
 
-  void ReconstructPartitions(
-      std::vector<ImageCluster>& inter_clusters,
-      std::unordered_map<const ImageCluster*, ReconstructionManager>&
-          reconstruction_managers,
-      std::vector<Reconstruction*>& reconstructions);
+  void ReconstructPartitions(std::unordered_map<size_t, ReconstructionManager>&
+                                 reconstruction_managers,
+                             std::vector<Reconstruction*>& reconstructions);
 
   void MergeClusters(std::vector<Reconstruction*>& reconstructions,
                      const int num_eff_threads, graph::Node& anchor_node);
 
-  void MergeClusters(
-      std::vector<Reconstruction*>& reconstructions,
-      std::unordered_map<const ImageCluster*, ReconstructionManager>&
-          reconstruction_managers,
-      const int num_eff_threads);
+  void MergeClusters(std::vector<Reconstruction*>& reconstructions,
+                     std::unordered_map<size_t, ReconstructionManager>&
+                         reconstruction_managers,
+                     const int num_eff_threads);
 
   bool Triangulate();
   bool AdjustGlobalBundle();
@@ -219,6 +216,7 @@ class DistributedMapperController : public Thread {
   // Global rotations.
   std::unordered_map<image_t, Eigen::Vector3d> rotations_;
 
+  std::vector<ImageCluster> intra_clusters_;
   std::vector<ImageCluster> inter_clusters_;
 };
 

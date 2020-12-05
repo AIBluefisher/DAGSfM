@@ -336,8 +336,20 @@ IncrementalMapperController::IncrementalMapperController(
   RegisterCallback(INITIAL_IMAGE_PAIR_REG_CALLBACK);
   RegisterCallback(NEXT_IMAGE_REG_CALLBACK);
   RegisterCallback(LAST_IMAGE_REG_CALLBACK);
+}
 
-  server_.bind("GetLocalRecons", [this]() {
+IncrementalMapperController::~IncrementalMapperController() {
+  if (database_cache_.get() != nullptr) {
+    database_cache_.release();
+  }
+}
+
+bool IncrementalMapperController::BindMapperFuncs() {
+  if (server_ == nullptr) {
+    return false;
+  }
+
+  server_->bind("GetLocalRecons", [this]() {
     // std::vector<Reconstruction> reconstructions;
 
     // const size_t n = reconstruction_manager_->Size();
@@ -350,25 +362,15 @@ IncrementalMapperController::IncrementalMapperController(
     return reconstruction_manager_->Get(0);
   });
 
-  // server_.bind("ResetWorkerInfo", [this]() {
-  //   LOG(INFO) << "reset worker info";
-  //     info_.Reset();
-  //   LOG(INFO) << "End reset worker info";
-  // });
-
-  server_.bind("GetLocalDatabaseInfo", [&, this]() {
+  server_->bind("GetLocalDatabaseInfo", [&, this]() {
     LOG(INFO) << "Loading database";
     DatabaseInfo database_info;
     database_info.LoadDatabase(database_path_);
     LOG(INFO) << "End loading database";
     return database_info;
   });
-}
 
-IncrementalMapperController::~IncrementalMapperController() {
-  if (database_cache_.get() != nullptr) {
-    database_cache_.release();
-  }
+  return BindSfMBaseFuncs();
 }
 
 void IncrementalMapperController::SetDatabaseCache(

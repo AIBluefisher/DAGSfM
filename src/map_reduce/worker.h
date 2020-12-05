@@ -43,18 +43,29 @@
 #include "map_reduce/running_info.h"
 #include "util/misc.h"
 
+namespace std {
+template <typename T, typename... Ts>
+std::unique_ptr<T> make_unique(Ts&&... params) {
+  return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
+}
+}  // namespace std
+
 namespace DAGSfM {
 
 class Worker {
  public:
-  Worker() : server_(rpc::server(Worker::kRPCDefaultPort)) {
-    kRPCDefaultPort++;
+  Worker() : server_(nullptr) {}
 
-    server_.bind("StopServer", []() { rpc::this_server().stop(); });
+  inline void RunServer() { server_->run(); }
 
-    server_.bind("SaveImage", [](const std::string& image_path,
-                                 const std::string& image_name,
-                                 const std::vector<char>& buffer, int length) {
+  inline void BindServer(const uint16_t port = 8080) {
+    server_ = std::make_unique<rpc::server>(port);
+
+    server_->bind("StopServer", []() { rpc::this_server().stop(); });
+
+    server_->bind("SaveImage", [](const std::string& image_path,
+                                  const std::string& image_name,
+                                  const std::vector<char>& buffer, int length) {
       if (!colmap::ExistsDir(image_path)) {
         boost::filesystem::create_directories(image_path);
       }
@@ -68,21 +79,18 @@ class Worker {
     });
   }
 
-  inline void InitializeServer() { server_ = std::move(rpc::server(8080)); }
-
-  inline void RunServer() { server_.run(); }
-
  protected:
-  // uint16_t port_;
-  static uint16_t kRPCDefaultPort;
-  rpc::server server_;
+  // static uint16_t kRPCDefaultPort;
+  std::unique_ptr<rpc::server> server_;
 };
 
 class SfMWorker : public Worker {
  public:
   SfMWorker();
 
-  rpc::server& Server();
+  rpc::server* Server();
+
+  bool BindSfMBaseFuncs();
 
   void SetIdle(const bool idle);
 
