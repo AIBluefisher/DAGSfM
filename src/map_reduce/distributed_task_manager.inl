@@ -111,17 +111,19 @@ void DistributedTaskManager<DataType>::DistributeTasks() {
 
     const size_t job_id = Pop();
 
-    const std::vector<std::string>& image_names =
-        data_container_.cluster_images[job_id];
+    if (data_container_.cluster_images.count(job_id) != 0) {
+      const std::vector<std::string>& image_names =
+          data_container_.cluster_images[job_id];
 
-    LOG(INFO) << "Transferring images to worker #" << idle_worker_id << ".";
-    CallSaveImages(
-        idle_worker_id, data_container_.master_image_path,
-        colmap::JoinPaths(map_reduce_config_.image_paths[idle_worker_id],
-                          std::to_string(job_id) + "/images"),
-        image_names);
-    LOG(INFO) << "Transferring images to worker #" << idle_worker_id
-              << " completed.";
+      LOG(INFO) << "Transferring images to worker #" << idle_worker_id << ".";
+      CallSaveImages(
+          idle_worker_id, data_container_.master_image_path,
+          colmap::JoinPaths(map_reduce_config_.image_paths[idle_worker_id],
+                            std::to_string(job_id) + "/images"),
+          image_names);
+      LOG(INFO) << "Transferring images to worker #" << idle_worker_id
+                << " completed.";
+    }
 
     // Distributing a job to an idle worker.
     data_container_.DistributeTask(job_id, idle_worker_id);

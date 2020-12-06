@@ -288,7 +288,9 @@ bool DistributedMapperController::DistributedSfM() {
       distributed_task_manager.GetMapReduceConfig().server_ips;
   sfm_data_container.server_ports =
       distributed_task_manager.GetMapReduceConfig().server_ports;
-  sfm_data_container.cluster_images = cluster_images;
+  if (options_.transfer_images_to_server) {
+    sfm_data_container.cluster_images = cluster_images;
+  }
   sfm_data_container.cluster_database_caches = cluster_database_caches;
   sfm_data_container.task_type = "mapping";
 
