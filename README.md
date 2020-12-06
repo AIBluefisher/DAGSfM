@@ -128,6 +128,7 @@ sudo chmod +x scripts/shell/distributed_sfm.sh
 cd build/src/exe
 ./colmap local_sfm_worker --output_path=$output_path --port=$your_port
 ```
+The RPC server establishes on local worker would be listening on the given port, and keep waitting until master assigns a job. We can also establish multiple workers on one machine, but to notice that ***the port should be unique!***
 
 (2) Then, the ip and port for every server should be written in a `config.txt` file.
 The file format should follow:
