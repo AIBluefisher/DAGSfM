@@ -77,6 +77,7 @@ sudo make install
 ```
 
 #### [rpclib](https://github.com/qchateau/rpclib)
+[rpclib](https://github.com/qchateau/rpclib) is a light-weight Remote Procedure Call (RPC) library. Other RPC libs, such as GRPC, etc, are not chosen by this project for flexibility and convinience.
 
 ```sh
 git clone https://github.com/qchateau/rpclib.git
@@ -108,8 +109,8 @@ cmake .. && make -j8
 
 ## 3. Usage
 
-As our algorithm is not integrated in the `GUI` of `COLMAP`, we offer a script to run the 
-distributed SfM (We hope there is anyone that is interested in integrating this pipeline into the GUI).
+As our algorithm is not integrated in the `GUI` of `COLMAP`, the scripts to run the 
+distributed SfM are given (We hope there is anyone that is interested in integrating this pipeline into the GUI):
 
 ### Sequential Mode
 ```sh
