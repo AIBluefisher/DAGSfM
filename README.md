@@ -11,12 +11,41 @@ If you use this project for your research, please cite:
   journal = {Pattern Recognition},
   doi = {10.1016/j.patcog.2020.107537}
 }
-
+```
+```
 @inproceedings{schoenberger2016sfm,
     author={Sch\"{o}nberger, Johannes Lutz and Frahm, Jan-Michael},
     title={Structure-from-Motion Revisited},
     booktitle={Conference on Computer Vision and Pattern Recognition (CVPR)},
     year={2016},
+}
+```
+
+If you use the RBR based Lagrangian rotation averaging solver for your research, please cite
+```
+@inproceedings{DBLP:conf/cvpr/ErikssonOKC18,
+  author    = {Anders P. Eriksson and
+               Carl Olsson and
+               Fredrik Kahl and
+               Tat{-}Jun Chin},
+  title     = {Rotation Averaging and Strong Duality},
+  booktitle = {{IEEE} Conference on Computer Vision and Pattern Recognition},
+  pages     = {127--135},
+  year      = {2018},
+}
+
+@article{EriksonOKC20,
+	author    = {Eriksson, Anders and Olsson, Carl and Kahl, Fredrik and Chin, Tat-Jun},
+	title     = {Rotation Averaging with the Chordal Distance: Global Minimizers and Strong Duality},
+	journal   = {{IEEE} Trans. Pattern Anal. Mach. Intell.},
+	year      = {2020},
+}
+
+@TECHREPORT{Wen09rowby,
+    author = {Zaiwen Wen and Donald Goldfarb and Shiqian Ma and Katya Scheinberg},
+    title = {Row by row methods for semidefinite programming },
+    institution = {},
+    year = {2009}
 }
 ```
 
@@ -128,7 +157,7 @@ sudo chmod +x scripts/shell/distributed_sfm.sh
 cd build/src/exe
 ./colmap local_sfm_worker --output_path=$output_path --port=$your_port
 ```
-The RPC server establishes on local worker would be listening on the given port, and keep waitting until master assigns a job. We can also establish multiple workers on one machine, but to notice that ***the port should be unique!***
+The RPC server establishes on local worker would be listening on the given port, and keep waitting until master assigns a job. We can also establish multiple workers on one machine, but to notice that ***port number should be unique!***
 
 (2) Then, the ip and port for every server should be written in a `config.txt` file.
 The file format should follow:
@@ -211,8 +240,7 @@ local maps. As a very large scale map requires much time to optimize scene struc
 - `completeness_ratio`: This option indicate the overlapping between clusters. 0.5~0.7 is enough 
 in practice.
 
-- `cluster_type`: This option decides which cluster method we choose for image clustering. We support `NCut` and `Spectral` Clustering. `Spectra` clustering is more accurate than `NCut` but
-it would be slow if we want to divide images into many clusters, as it needs much time to compute
+- `cluster_type`: This option decides which cluster method we choose for image clustering. We support `NCut` and `Spectral` Clustering. `Spectra` clustering is more accurate than `NCut` but it might be slower if we want to divide images into many clusters, as it needs much time to compute
 eigen vectors.
 
 If succeed, camera poses and sparse points should be included in `$DATASET/sparse` folder, you can use COLMAP's GUI to 
@@ -248,7 +276,7 @@ limit the image number of each small map, and use this parameter to segment larg
   - OpenMP for DAGSfM when running in sequential mode. This can be faster as one partition
     always cannot have an 100% CPU occupation (usually 40% ~ 60%). And the acceleration
     depends on the hardware and datasets scale.
-  - Lazy initialization of RPC server, user should given the port number in their command.
+  - Lazy initialization of RPC server, user should provide the port number in command line.
     Server would not listen on a port when running in sequential mode, so as to avoid crash
     when viewing models in GUI.
 
