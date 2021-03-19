@@ -240,7 +240,7 @@ Before running this command, make sure `path_to_colmap_data` contains `images.tx
 - `max_image_num`: As colmap data includes images data, where store all registered images' data. We
 limit the image number of each small map, and use this parameter to segment large maps. Though it's better to use the number of point clouds in practice, we haven't release the related implementation and we will enhance this helper further.
 
-- 'write_binary`: set to `1`  if save colmap data in binary format, or set to  `0`  to save colmap data in text format.
+- `write_binary`: set to `1`  if save colmap data in binary format, or set to  `0`  to save colmap data in text format.
 
 ## ChangeLog
 
