@@ -21,34 +21,6 @@ If you use this project for your research, please cite:
 }
 ```
 
-If you use the RBR based Lagrangian rotation averaging solver for your research, please cite
-```
-@inproceedings{DBLP:conf/cvpr/ErikssonOKC18,
-  author    = {Anders P. Eriksson and
-               Carl Olsson and
-               Fredrik Kahl and
-               Tat{-}Jun Chin},
-  title     = {Rotation Averaging and Strong Duality},
-  booktitle = {{IEEE} Conference on Computer Vision and Pattern Recognition},
-  pages     = {127--135},
-  year      = {2018},
-}
-
-@article{EriksonOKC20,
-	author    = {Eriksson, Anders and Olsson, Carl and Kahl, Fredrik and Chin, Tat-Jun},
-	title     = {Rotation Averaging with the Chordal Distance: Global Minimizers and Strong Duality},
-	journal   = {{IEEE} Trans. Pattern Anal. Mach. Intell.},
-	year      = {2020},
-}
-
-@TECHREPORT{Wen09rowby,
-    author = {Zaiwen Wen and Donald Goldfarb and Shiqian Ma and Katya Scheinberg},
-    title = {Row by row methods for semidefinite programming },
-    institution = {},
-    year = {2009}
-}
-```
-
 ## 2. How to Build
 
 ### 2.1 Required
