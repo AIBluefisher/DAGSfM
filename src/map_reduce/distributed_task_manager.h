@@ -112,13 +112,14 @@ struct MatchesDataContainer : public TaskDataContainer {
 };
 
 struct SfMDataContainer : public TaskDataContainer {
-  std::vector<Reconstruction> reconstructions;
-  std::unordered_map<size_t, DatabaseCache> cluster_database_caches;
+  std::vector<std::unique_ptr<Reconstruction>> reconstructions;
+  std::unique_ptr<std::unordered_map<size_t, DatabaseCache>> cluster_database_caches;
 
+  SfMDataContainer() : cluster_database_caches(new std::unordered_map<size_t, DatabaseCache>()){}
   virtual void DistributeTask(const size_t job_id,
                               const int worker_id) override {
     rpc::client c(server_ips[worker_id], server_ports[worker_id]);
-    c.async_call("RunSfM", cluster_database_caches[job_id]);
+    c.async_call("RunSfM", (*cluster_database_caches)[job_id]);
     c.call("SetNonIdle");
   }
 
@@ -126,9 +127,7 @@ struct SfMDataContainer : public TaskDataContainer {
     rpc::client c(server_ips[worker_id], server_ports[worker_id]);
 
     auto local_recons_obj = c.call("GetLocalRecons");
-    Reconstruction recon = local_recons_obj.get().as<Reconstruction>();
-
-    reconstructions.emplace_back(recon);
+    reconstructions.emplace_back(new Reconstruction(local_recons_obj.get().as<Reconstruction>()));
 
     c.async_call("ResetWorkerInfo");
   }

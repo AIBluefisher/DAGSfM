@@ -67,6 +67,12 @@ size_t ReconstructionManager::Add() {
   return idx;
 }
 
+size_t ReconstructionManager::Add(Reconstruction* reconsturction) {
+  const size_t idx = Size();
+  reconstructions_.emplace_back(reconsturction);
+  return idx;
+}
+
 void ReconstructionManager::Delete(const size_t idx) {
   CHECK_LT(idx, reconstructions_.size());
   reconstructions_.erase(reconstructions_.begin() + idx);
