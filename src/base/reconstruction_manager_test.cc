@@ -52,6 +52,15 @@ BOOST_AUTO_TEST_CASE(TestAddGet) {
     BOOST_CHECK_EQUAL(reconstruction_manager.Get(idx).NumImages(), 0);
     BOOST_CHECK_EQUAL(reconstruction_manager.Get(idx).NumPoints3D(), 0);
   }
+  reconstruction_manager.Clear();
+  for (size_t i = 0; i < 10; ++i) {
+    const size_t idx = reconstruction_manager.Add(new Reconstruction());
+    BOOST_CHECK_EQUAL(reconstruction_manager.Size(), i + 1);
+    BOOST_CHECK_EQUAL(idx, i);
+    BOOST_CHECK_EQUAL(reconstruction_manager.Get(idx).NumCameras(), 0);
+    BOOST_CHECK_EQUAL(reconstruction_manager.Get(idx).NumImages(), 0);
+    BOOST_CHECK_EQUAL(reconstruction_manager.Get(idx).NumPoints3D(), 0);
+  }
 }
 
 BOOST_AUTO_TEST_CASE(TestDelete) {

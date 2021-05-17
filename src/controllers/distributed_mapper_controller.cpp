@@ -96,17 +96,23 @@ void DistributedMapperController::SetMapReduceConfig(
 }
 
 void DistributedMapperController::Run() {
-  // Load existed database.
-  bool load_exist_database = LoadTwoviewGeometries();
 
   Timer timer;
+  double load_twoview_geometries_time = 0.0;
   double indexing_time = 0.0;
   double matching_time = 0.0;
+  double extract_largest_cc_time = 0.0;
   double ra_time = 0.0;
   double cluster_time = 0.0;
   double sfm_time = 0.0;
   double triangulate_time = 0.0;
   double ba_time = 0.0;
+
+  // Load existed database.
+  timer.Start();
+  bool load_exist_database = LoadTwoviewGeometries();
+  timer.Pause();
+  load_twoview_geometries_time = timer.ElapsedSeconds();
 
   //////////////////////////////////////////////////////////////////
   // //  1. Indexing images by similarity search ///////////////////
@@ -143,9 +149,12 @@ void DistributedMapperController::Run() {
   if (options_.reconstruct_largest_cc) {
     PrintHeading1("Extracting Largest Connected Component...");
     LOG(INFO) << "Total image number: " << view_graph_.ImageIds().size();
+    timer.Start();
     view_graph_.FilterViewGraphCyclesByRotation(5.0);
     view_graph_.TwoviewGeometriesToImagePairs();
     view_graph_.ExtractLargestCC();
+    timer.Pause();
+    extract_largest_cc_time = timer.ElapsedSeconds();
     LOG(INFO) << "image number in largest cc: "
               << view_graph_.ImageIds().size();
   }
@@ -204,13 +213,16 @@ void DistributedMapperController::Run() {
   }
 
   LOG(INFO) << "Time elapsed: \n"
+            << "  -[load two view geometries]: " << load_twoview_geometries_time << " seconds.\n"
             << "  -[image indexing]: " << indexing_time << " seconds.\n"
             << "  -[extraction + matching]: " << matching_time << " seconds.\n"
+            << "  -[Largest connected components extraction]: " << extract_largest_cc_time << " seconds.\n"
             << "  -[Rotation Averaging]: " << ra_time << " seconds.\n"
             << "  -[Image Clustering]: " << cluster_time << " seconds.\n"
             << "  -[SfM]: " << sfm_time << " seconds.\n"
             << "  -[Triangulate]: " << triangulate_time << " seconds.\n"
             << "  -[Bundle Adjustment]: " << ba_time << " seconds.\n";
+  LOG(INFO) << "Reconstruction size: " << reconstruction_manager_->Size();
   reconstruction_manager_->Get(0).ShowReconInfo();
 }
 
@@ -237,16 +249,18 @@ bool DistributedMapperController::SequentialSfM() {
 }
 
 bool DistributedMapperController::DistributedSfM() {
+  Timer timer;
   /////////////////////////////////////////////////////////
   //// 1. Data preparation for local clusters /////////////
   /////////////////////////////////////////////////////////
   PrintHeading1("Reconstructing Clusters...");
-  std::unordered_map<size_t, DatabaseCache> cluster_database_caches;
+  std::unique_ptr<std::unordered_map<size_t, DatabaseCache>> 
+                  cluster_database_caches(new std::unordered_map<size_t, DatabaseCache>());
   std::unordered_map<size_t, std::vector<std::string>> cluster_images;
   const std::unordered_map<image_t, std::string>& image_id_to_name =
       view_graph_.ImageIdToName();
 
-  cluster_database_caches.reserve(inter_clusters_.size());
+  cluster_database_caches->reserve(inter_clusters_.size());
   cluster_images.reserve(inter_clusters_.size());
 
   IncrementalMapperOptions local_mapper_options;
@@ -264,7 +278,7 @@ bool DistributedMapperController::DistributedSfM() {
 
     std::unordered_set<std::string> image_name_set(image_name_list.begin(),
                                                    image_name_list.end());
-    cluster_database_caches[k].Load(
+    (*cluster_database_caches)[k].Load(
         database_, static_cast<size_t>(local_mapper_options.min_num_matches),
         local_mapper_options.ignore_watermarks, image_name_set);
   }
@@ -291,7 +305,7 @@ bool DistributedMapperController::DistributedSfM() {
   if (options_.transfer_images_to_server) {
     sfm_data_container.cluster_images = cluster_images;
   }
-  sfm_data_container.cluster_database_caches = cluster_database_caches;
+  sfm_data_container.cluster_database_caches.swap(cluster_database_caches);
   sfm_data_container.task_type = "mapping";
 
   for (size_t i = 0; i < cluster_num; i++) {
@@ -313,7 +327,7 @@ bool DistributedMapperController::DistributedSfM() {
   //////////////////////////////////////////////////
   std::vector<Reconstruction*> reconstructions;
   for (uint i = 0; i < sfm_data_container.reconstructions.size(); i++) {
-    reconstructions.push_back(&sfm_data_container.reconstructions[i]);
+    reconstructions.push_back(sfm_data_container.reconstructions[i].release());
   }
 
   for (uint i = 0; i < reconstructions.size(); i++) {
@@ -323,7 +337,7 @@ bool DistributedMapperController::DistributedSfM() {
   LOG(INFO) << "Sub-reconstructions size: " << reconstructions.size();
 #ifdef __DEBUG__
   LOG(INFO) << "Extracting colors for local maps.";
-  for (Reconstruction* reconstruction : reconstructions) {
+  for (auto reconstruction : reconstructions) {
     ExtractColors(options_.image_path, reconstruction);
   }
   ExportUntransformedLocalRecons(reconstructions);
@@ -337,10 +351,17 @@ bool DistributedMapperController::DistributedSfM() {
   Node anchor_node;
   MergeClusters(reconstructions, num_eff_threads, anchor_node);
 
+  LOG(INFO) << "Saving anchor node reconstruction...";
+  timer.Start();
   reconstructions[anchor_node.id]->ShowReconInfo();
-  reconstruction_manager_->Add();
-  reconstruction_manager_->Get(0) = *reconstructions[anchor_node.id];
-
+  reconstruction_manager_->Add(reconstructions[anchor_node.id]);
+  reconstructions[anchor_node.id] = nullptr;
+  timer.Pause();
+  LOG(INFO) << "Time elapsed (saving anchor node reconstruction): " << timer.ElapsedSeconds();
+  for (int i = 0; i < reconstructions.size(); ++i) {
+    if (i != anchor_node.id) delete(reconstructions[i]);
+  }
+  
   return true;
 }
 
@@ -350,14 +371,14 @@ bool DistributedMapperController::SequentialFeatureExtractionAndMatching() {
   timer.Start();
   ExtractFeature();
   timer.Pause();
-  LOG(INFO) << "Timer elapsed (feature extraction): " << timer.ElapsedSeconds()
+  LOG(INFO) << "Time elapsed (feature extraction): " << timer.ElapsedSeconds()
             << " seconds";
 
   LOG(INFO) << "Matching...";
   timer.Start();
   Match();
   timer.Pause();
-  LOG(INFO) << "Timer elapsed: " << timer.ElapsedSeconds() << " seconds";
+  LOG(INFO) << "Time elapsed: " << timer.ElapsedSeconds() << " seconds";
 
   return true;
 }

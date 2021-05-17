@@ -58,6 +58,12 @@ class ReconstructionManager {
   // Add a new empty reconstruction and return its index.
   size_t Add();
 
+  // Add a new reconstruction and return its index. Note that the argument
+  // is used to initialize a unique_ptr, thus the caller is responsible to
+  // make the original pointer point to nullptr right after the function is
+  // called to avoid accessing memory managed by an unique_ptr.
+  size_t Add(Reconstruction* reconsturction);
+
   // Delete a specific reconstruction.
   void Delete(const size_t idx);
 
