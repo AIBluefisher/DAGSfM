@@ -53,8 +53,9 @@ $DATASET_PATH/$output_folder \
 --long_track_length_threshold=10 \
 --graph_dir=$DATASET_PATH/$output_folder \
 --num_images_ub=$num_images_ub \
+--ImageClustering.num_threads=16 \
 --completeness_ratio=0.7 \
 --relax_ratio=1.3 \
---cluster_type=SPECTRA #SPECTRA #NCUT COMMUNITY_DETECTION #
+--cluster_type=NCUT #SPECTRA #NCUT COMMUNITY_DETECTION #
 # --max_num_cluster_pairs=$max_num_cluster_pairs \
 # --image_overlap=$image_overlap \

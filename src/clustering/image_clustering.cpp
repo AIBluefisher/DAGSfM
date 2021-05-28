@@ -61,24 +61,24 @@ ImageClustering::ImageClustering(const Options& options,
                                  const ImageCluster& root_cluster)
     : options_(options), root_cluster_(root_cluster) {
   CHECK(options_.Check());
-  summary_.original_images_num = root_cluster_.image_ids.size();
-  summary_.original_edges_num = root_cluster_.edges.size();
+  summary_.original_images_num = root_cluster_.ImageIdsSize();
+  summary_.original_edges_num = root_cluster_.EdgesSize();
 }
 
 void ImageClustering::Cut() {
   timer_.Start();
   const uint num_clusters =
-      root_cluster_.image_ids.size() / options_.num_images_ub;
+      root_cluster_.ImageIdsSize() / options_.num_images_ub;
   CHECK_GE(num_clusters, 1);
 
   std::vector<std::pair<int, int>> image_pairs;
   std::vector<int> weights;
-  image_pairs.reserve(root_cluster_.edges.size());
-  weights.reserve(root_cluster_.edges.size());
+  image_pairs.reserve(root_cluster_.EdgesSize());
+  weights.reserve(root_cluster_.EdgesSize());
 
-  for (auto edge : root_cluster_.edges) {
-    image_pairs.push_back(std::make_pair(edge.first.first, edge.first.second));
-    weights.push_back(edge.second);
+  for (const auto& edge : root_cluster_.Edges()) {
+    image_pairs.emplace_back(edge.first.first, edge.first.second);
+    weights.emplace_back(edge.second);
   }
 
   LOG(INFO) << "Images Clustering Started ";
@@ -99,7 +99,7 @@ void ImageClustering::Cut() {
   // Collect nodes according to the partition result
   intra_clusters_.resize(cluster->ClusterNum());
   for (const auto label : labels) {
-    intra_clusters_[label.second].image_ids.push_back(label.first);
+    intra_clusters_[label.second].AddImageId(label.first);
   }
   for (uint i = 0; i < intra_clusters_.size(); i++) {
     intra_clusters_[i].cluster_id = i;
@@ -114,13 +114,12 @@ void ImageClustering::Cut() {
     const int cluster_id2 = labels[j];
 
     if (cluster_id1 == cluster_id2) {
-      intra_clusters_[cluster_id1].edges.insert(
-          std::make_pair(ImagePair(i, j), weights[k]));
+      intra_clusters_[cluster_id1].AddEdge(std::make_pair(ImagePair(i, j), weights[k]));
     } else {
       const ImagePair view_pair = cluster_id1 < cluster_id2
                                       ? ImagePair(cluster_id1, cluster_id2)
                                       : ImagePair(cluster_id2, cluster_id1);
-      clusters_lost_edges_[view_pair].push_back(graph::Edge(i, j, weights[k]));
+      clusters_lost_edges_[view_pair].emplace_back(i, j, weights[k]);
     }
   }
 
@@ -157,12 +156,54 @@ void ImageClustering::Expand() {
   AnalyzeStatistic();
 }
 
+void ImageClustering::Expand(const int num_threads, Thread* thread) {
+  LOG(INFO) << "Expanding Images...";
+
+  const uint num_clusters = intra_clusters_.size();
+  inter_clusters_.reserve(num_clusters);
+  for (const auto& cluster : intra_clusters_) {
+    inter_clusters_.emplace_back(cluster);
+  }
+
+  ThreadPool expand_thread_pool(num_threads);
+  std::vector<std::future<void>> futures;
+
+  timer_.Start();
+  LOG(INFO) << "num_clusters: " << num_clusters;
+  if (num_clusters > 1) {
+    for (const auto& it : clusters_lost_edges_) {
+      if (thread->IsStopped()) {
+        return;
+      }
+      const ImagePair cluster_pair = it.first;
+      std::vector<graph::Edge> lost_edges = it.second;
+      futures.push_back(
+          expand_thread_pool.AddTask(
+              &ImageClustering::AddLostEdgesBetweenClusters, this,
+              std::ref(inter_clusters_[cluster_pair.first]),
+              std::ref(inter_clusters_[cluster_pair.second]),
+              lost_edges));
+    }
+  }
+
+  for (auto& future : futures) {
+    future.get();
+  }
+
+  timer_.Pause();
+  summary_.total_expansion_time = timer_.ElapsedSeconds();
+  summary_.total_expansion_num = 1;
+  summary_.total_time =
+      summary_.total_cutting_time + summary_.total_expansion_time;
+  AnalyzeStatistic();
+}
+
 void ImageClustering::ExpandAllEdges() {
   LOG(INFO) << "Expanding All Lost Edges...";
 
   const uint num_clusters = intra_clusters_.size();
   inter_clusters_.reserve(num_clusters);
-  for (auto cluster : intra_clusters_) {
+  for (const auto& cluster : intra_clusters_) {
     inter_clusters_.emplace_back(cluster);
   }
 
@@ -181,18 +222,18 @@ void ImageClustering::ExpandAllEdges() {
                                          : ImagePair(edge.dst, edge.src);
 
         ImageCluster& selected_cluster =
-            cluster1.edges.size() > cluster2.edges.size() ? cluster2 : cluster1;
-        const std::unordered_set<image_t> images(
-            selected_cluster.image_ids.begin(),
-            selected_cluster.image_ids.end());
+            cluster1.EdgesSize() > cluster2.EdgesSize() ? cluster2 : cluster1;
+
+        const std::unordered_set<image_t>& images = selected_cluster.ImageIds();
+
         if (images.count(edge.src) == 0) {
-          selected_cluster.image_ids.push_back(edge.src);
+          selected_cluster.AddImageId(edge.src);
         }
         if (images.count(edge.dst) == 0) {
-          selected_cluster.image_ids.push_back(edge.dst);
+          selected_cluster.AddImageId(edge.dst);
         }
 
-        selected_cluster.edges[image_pair] = edge.weight;
+        selected_cluster.AddEdge(image_pair, edge.weight);
       }
     }
   }
@@ -212,7 +253,7 @@ std::vector<ImageCluster> ImageClustering::BiCut(
   std::vector<std::pair<int, int>> image_pairs;
   std::vector<int> weights;
 
-  for (auto edge : image_cluster.edges) {
+  for (const auto& edge : image_cluster.Edges()) {
     image_pairs.push_back(std::make_pair(edge.first.first, edge.first.second));
     weights.push_back(edge.second);
   }
@@ -223,7 +264,7 @@ std::vector<ImageCluster> ImageClustering::BiCut(
 
   // collect nodes according to the partition result
   for (const auto label : labels) {
-    image_clusters[label.second].image_ids.push_back(label.first);
+    image_clusters[label.second].AddImageId(label.first);
   }
 
   for (size_t k = 0; k < image_pairs.size(); k++) {
@@ -233,8 +274,7 @@ std::vector<ImageCluster> ImageClustering::BiCut(
     const int cluster_id2 = labels[j];
 
     if (cluster_id1 == cluster_id2) {
-      image_clusters[cluster_id1].edges.insert(
-          std::make_pair(ImagePair(i, j), weights[k]));
+      image_clusters[cluster_id1].AddEdge(std::make_pair(ImagePair(i, j), weights[k]));
     } else {
       discarded_edges_.push(graph::Edge(i, j, weights[k]));
     }
@@ -253,8 +293,8 @@ void ImageClustering::CutAndExpand() {
 
   std::vector<ImageCluster> init_clusters = BiCut(root_cluster_);
   std::queue<ImageCluster> candidate_clusters;
-  for (auto cluster : init_clusters) {
-    candidate_clusters.push(cluster);
+  for (const auto& cluster : init_clusters) {
+    candidate_clusters.emplace(cluster);
   }
 
   while (!candidate_clusters.empty()) {
@@ -263,12 +303,12 @@ void ImageClustering::CutAndExpand() {
     while (!candidate_clusters.empty()) {
       ImageCluster cluster = candidate_clusters.front();
       candidate_clusters.pop();
-      if (cluster.image_ids.size() <= options_.num_images_ub) {
-        inter_clusters_.push_back(cluster);
+      if (cluster.ImageIdsSize() <= options_.num_images_ub) {
+        inter_clusters_.emplace_back(cluster);
       } else {
         std::vector<ImageCluster> clusters = BiCut(cluster);
         for (int k = 0; k < options_.branching_factor; k++) {
-          candidate_clusters.push(clusters[k]);
+          candidate_clusters.emplace(clusters[k]);
         }
       }
     }
@@ -294,17 +334,15 @@ void ImageClustering::CutAndExpand() {
       }
 
       ImageCluster& image_cluster = inter_clusters_[cluster_id];
-      std::unordered_set<image_t> image_sets(image_cluster.image_ids.begin(),
-                                             image_cluster.image_ids.end());
+      const std::unordered_set<image_t>& image_sets = image_cluster.ImageIds();
       image_t added_image =
-          image_sets.find(edge.src) == image_sets.end() ? edge.src : edge.dst;
+          image_sets.find(edge.src) == image_sets.cend() ? edge.src : edge.dst;
       VLOG(2) << "discarded edge: " << edge.src << ", " << edge.dst;
       VLOG(2) << "added image:    " << added_image;
-      if (image_sets.find(added_image) == image_sets.end()) {
-        image_cluster.image_ids.push_back(added_image);
+      if (image_sets.find(added_image) == image_sets.cend()) {
+        image_cluster.AddImageId(added_image);
       }
-      image_cluster.edges.insert(
-          std::make_pair(ImagePair(edge.src, edge.dst), edge.weight));
+      image_cluster.AddEdge(std::make_pair(ImagePair(edge.src, edge.dst), edge.weight));
     }
     timer_.Pause();
     summary_.total_expansion_time += timer_.ElapsedSeconds();
@@ -314,7 +352,7 @@ void ImageClustering::CutAndExpand() {
     // satisfy the size constraint, thus we need to re-partition it
     LOG(INFO) << "Re-grouping clusters...";
     for (auto iter = inter_clusters_.begin(); iter != inter_clusters_.end();) {
-      if (iter->image_ids.size() >
+      if (iter->ImageIdsSize() >
           options_.relax_ratio * options_.num_images_ub) {
         candidate_clusters.push(*iter);
         iter = inter_clusters_.erase(iter);
@@ -411,12 +449,9 @@ std::unique_ptr<Cluster> ImageClustering::CreateCluster(
 }
 
 bool ImageClustering::IsSatisfyCompletenessRatio(const ImageCluster& cluster) {
-  if (cluster.is_condition_satisfy) return true;
+  if (cluster.IsConditionSatisfy()) return true;
 
   const uint i = cluster.cluster_id;
-  std::unordered_set<image_t> image_sets(cluster.image_ids.begin(),
-                                         cluster.image_ids.end());
-
   uint repeated_node_num = 0;
   for (uint j = 0; j < inter_clusters_.size(); j++) {
     if (i == j) continue;
@@ -427,12 +462,12 @@ bool ImageClustering::IsSatisfyCompletenessRatio(const ImageCluster& cluster) {
 
   // check if satisfy completeness ratio to avoid adding too many edges
   const float repeated_ratio =
-      (float)repeated_node_num / (float)(inter_clusters_[i].image_ids.size());
+      (float)repeated_node_num / (float)(inter_clusters_[i].ImageIdsSize());
   if (repeated_ratio <= options_.completeness_ratio) {
     VLOG(4) << "repeated ratio: " << repeated_ratio;
     return false;
   } else {
-    inter_clusters_[i].is_condition_satisfy = true;
+    inter_clusters_[i].SetIsConditionSatisfy(true);
     return true;
   }
 }
@@ -441,10 +476,9 @@ int ImageClustering::ClusterSatisfyCompletenessRatio(const graph::Edge& edge) {
   int cluster_id = -1;
 
   for (uint i = 0; i < inter_clusters_.size() - 1; i++) {
-    std::unordered_set<image_t> image_sets(inter_clusters_[i].image_ids.begin(),
-                                           inter_clusters_[i].image_ids.end());
-    if (image_sets.find(edge.src) == image_sets.end() &&
-        image_sets.find(edge.dst) == image_sets.end()) {
+    const std::unordered_set<image_t>& image_sets = inter_clusters_[i].ImageIds();
+    if (image_sets.find(edge.src) == image_sets.cend() &&
+        image_sets.find(edge.dst) == image_sets.cend()) {
       continue;
     }
 
@@ -459,7 +493,7 @@ int ImageClustering::ClusterSatisfyCompletenessRatio(const graph::Edge& edge) {
 
     // check if satisfy completeness ratio to avoid adding too many edges
     const float repeated_ratio =
-        (float)repeated_node_num / (float)(inter_clusters_[i].image_ids.size());
+        (float)repeated_node_num / (float)(inter_clusters_[i].ImageIdsSize());
     if (repeated_ratio <= options_.completeness_ratio) {
       VLOG(4) << "repeated ratio: " << repeated_ratio;
       cluster_id = i;
@@ -467,7 +501,7 @@ int ImageClustering::ClusterSatisfyCompletenessRatio(const graph::Edge& edge) {
     } else {
       // LOG(INFO) << "cluster " << i << " repeated ratio: " << repeated_ratio;
       // LOG(INFO) << "total clusters: " << inter_clusters_.size();
-      inter_clusters_[i].is_condition_satisfy = true;
+      inter_clusters_[i].SetIsConditionSatisfy(true);
     }
   }
 
@@ -477,13 +511,11 @@ int ImageClustering::ClusterSatisfyCompletenessRatio(const graph::Edge& edge) {
 uint ImageClustering::CommonImagesNum(const ImageCluster& cluster1,
                                       const ImageCluster& cluster2) const {
   uint common_images_num = 0;
-  const std::unordered_set<image_t> images1(cluster1.image_ids.begin(),
-                                            cluster1.image_ids.end());
-  const std::unordered_set<image_t> images2(cluster2.image_ids.begin(),
-                                            cluster2.image_ids.end());
+  const std::unordered_set<image_t> images1 = cluster1.ImageIds();
+  const std::unordered_set<image_t> images2 = cluster2.ImageIds();
 
-  for (auto it = images1.begin(); it != images1.end(); ++it) {
-    if (images2.find(*it) != images2.end()) {
+  for (auto it = images1.cbegin(); it != images1.cend(); ++it) {
+    if (images2.find(*it) != images2.cend()) {
       common_images_num++;
     }
   }
@@ -523,7 +555,7 @@ void ImageClustering::OutputClusteringSummary() const {
 
 bool ImageClustering::IsRemainingClusters() const {
   for (auto cluster : inter_clusters_) {
-    if (!cluster.is_condition_satisfy) return true;
+    if (!cluster.IsConditionSatisfy()) return true;
   }
   return false;
 }
@@ -556,34 +588,39 @@ void ImageClustering::AddLostEdgesBetweenClusters(
             ? ImagePair(lost_edges[k].src, lost_edges[k].dst)
             : ImagePair(lost_edges[k].dst, lost_edges[k].src);
 
-    const std::unordered_set<image_t> images1(cluster1.image_ids.begin(),
-                                              cluster1.image_ids.end());
-    const std::unordered_set<image_t> images2(cluster2.image_ids.begin(),
-                                              cluster2.image_ids.end());
+    const std::unordered_set<image_t> images1 = cluster1.ImageIds();
+    const std::unordered_set<image_t> images2 = cluster2.ImageIds();
 
     const image_t added_image1 =
-        images1.find(lost_edges[k].src) == images1.end() ? lost_edges[k].src
+        images1.find(lost_edges[k].src) == images1.cend() ? lost_edges[k].src
                                                          : lost_edges[k].dst;
     const image_t added_image2 =
-        images2.find(lost_edges[k].src) == images2.end() ? lost_edges[k].src
+        images2.find(lost_edges[k].src) == images2.cend() ? lost_edges[k].src
                                                          : lost_edges[k].dst;
 
     // Select a cluster that has a smaller size, such that
     // larger clusters can avoid become too large.
     int selected_image =
-        cluster1.image_ids.size() > cluster2.image_ids.size() ? 2 : 1;
+        cluster1.ImageIdsSize() > cluster2.ImageIdsSize() ? 2 : 1;
     if (selected_image == 1) {
       if (!IsSatisfyCompletenessRatio(cluster1) &&
-          images1.find(added_image1) == images1.end()) {
-        cluster1.image_ids.push_back(added_image1);
-        cluster1.edges[view_pair] = lost_edges[k].weight;
+          images1.find(added_image1) == images1.cend()) {
+        cluster1.AddImageId(added_image1);
+        cluster1.AddEdge(view_pair, lost_edges[k].weight);
       }
     } else {
       if (!IsSatisfyCompletenessRatio(cluster2) &&
-          images2.find(added_image2) == images2.end()) {
-        cluster2.image_ids.push_back(added_image2);
-        cluster2.edges[view_pair] = lost_edges[k].weight;
+          images2.find(added_image2) == images2.cend()) {
+        cluster2.AddImageId(added_image2);
+        cluster2.AddEdge(view_pair, lost_edges[k].weight);
       }
+    }
+
+    // If both completeness ratios of cluster1 and cluster2 
+    // are satisfied, return earlier.
+    if (IsSatisfyCompletenessRatio(cluster1) &&
+        IsSatisfyCompletenessRatio(cluster2)) {
+      return;
     }
   }
 }
@@ -591,9 +628,8 @@ void ImageClustering::AddLostEdgesBetweenClusters(
 void ImageClustering::AnalyzeStatistic() {
   LOG(INFO) << "Analysing Statistics...";
   for (auto& cluster : inter_clusters_) {
-    std::sort(cluster.image_ids.begin(), cluster.image_ids.end());
-    summary_.clustered_images_num += cluster.image_ids.size();
-    summary_.clustered_edges_num += cluster.edges.size();
+    summary_.clustered_images_num += cluster.ImageIdsSize();
+    summary_.clustered_edges_num += cluster.EdgesSize();
   }
 }
 

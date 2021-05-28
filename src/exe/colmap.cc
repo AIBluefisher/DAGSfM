@@ -871,6 +871,7 @@ int RunDistributedMapper(int argc, char** argv) {
   options.AddDefaultOption("max_num_cluster_pairs",
                            &clustering_options.max_num_cluster_pairs);
   options.AddDefaultOption("cluster_type", &clustering_options.cluster_type);
+  options.AddDefaultOption("ImageClustering.num_threads", &clustering_options.num_threads);
   options.AddDefaultOption("graph_dir", &clustering_options.graph_dir);
   options.AddDefaultOption("num_images", &search_options.num_images);
   options.AddDefaultOption("num_nearest_neighbors",
