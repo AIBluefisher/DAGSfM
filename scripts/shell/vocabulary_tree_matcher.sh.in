@@ -31,30 +31,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 DATASET_PATH=$1
-num_images_ub=$2
-log_folder=$3
-CONFIG_FILE_PATH=$4
+VOC_TREE_PATH=$2
 
-/home/chenyu/Projects/Disco/build/src/exe/colmap distributed_mapper \
-$DATASET_PATH/$log_folder \
+${CMAKE_BINARY_DIR}/src/exe/colmap vocab_tree_matcher \
 --database_path=$DATASET_PATH/database.db \
---image_path=$DATASET_PATH/images \
---output_path=$DATASET_PATH/$log_folder \
---vocab_tree_path=$DATASET_PATH \
---config_file_name=$CONFIG_FILE_PATH/config.txt \
---num_workers=8 \
---distributed=0 \
---num_images=100 \
---assign_cluster_id=1 \
---write_binary=1 \
---retriangulate=0 \
---final_ba=1 \
---select_tracks_for_bundle_adjustment=1 \
---long_track_length_threshold=10 \
---graph_dir=$DATASET_PATH/$log_folder \
---num_images_ub=$num_images_ub \
---completeness_ratio=0.7 \
---relax_ratio=1.3 \
---cluster_type=SPECTRA #SPECTRA #NCUT COMMUNITY_DETECTION #
-# --max_num_cluster_pairs=$max_num_cluster_pairs \
-# --image_overlap=$image_overlap \
+--SiftMatching.num_threads=8 \
+--SiftMatching.use_gpu=0 \
+--SiftMatching.gpu_index=-1 \
+--VocabTreeMatching.num_images=100 \
+--VocabTreeMatching.num_nearest_neighbors=5 \
+--VocabTreeMatching.vocab_tree_path=$VOC_TREE_PATH

@@ -383,6 +383,7 @@ link_directories(${COLMAP_LINK_DIRS})
 
 add_subdirectory(lib)
 add_subdirectory(src)
+add_subdirectory(scripts)
 
 
 ################################################################################

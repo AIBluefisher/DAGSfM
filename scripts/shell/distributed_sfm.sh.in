@@ -1,0 +1,60 @@
+#  BSD 3-Clause License
+
+#  Copyright (c) 2020, Chenyu
+#  All rights reserved.
+
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+
+#  1. Redistributions of source code must retain the above copyright notice,
+#  this
+#     list of conditions and the following disclaimer.
+
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+
+#  3. Neither the name of the copyright holder nor the names of its
+#     contributors may be used to endorse or promote products derived from
+#     this software without specific prior written permission.
+
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+DATASET_PATH=$1
+num_images_ub=$2
+output_folder=$3
+CONFIG_FILE_PATH=$4
+
+${CMAKE_BINARY_DIR}/src/exe/colmap distributed_mapper \
+$DATASET_PATH/$output_folder \
+--database_path=$DATASET_PATH/database.db \
+--image_path=$DATASET_PATH/images \
+--output_path=$DATASET_PATH/$output_folder \
+--vocab_tree_path=$DATASET_PATH \
+--config_file_name=$CONFIG_FILE_PATH/config.txt \
+--num_workers=8 \
+--distributed=0 \
+--num_images=100 \
+--assign_cluster_id=1 \
+--write_binary=1 \
+--retriangulate=0 \
+--final_ba=1 \
+--select_tracks_for_bundle_adjustment=1 \
+--long_track_length_threshold=10 \
+--graph_dir=$DATASET_PATH/$output_folder \
+--num_images_ub=$num_images_ub \
+--completeness_ratio=0.7 \
+--relax_ratio=1.3 \
+--cluster_type=SPECTRA #SPECTRA #NCUT COMMUNITY_DETECTION #
+# --max_num_cluster_pairs=$max_num_cluster_pairs \
+# --image_overlap=$image_overlap \

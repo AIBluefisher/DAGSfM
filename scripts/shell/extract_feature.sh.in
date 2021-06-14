@@ -32,7 +32,7 @@
 
 DATASET_PATH=$1
 
-/home/chenyu/Projects/Disco/build/src/exe/colmap feature_extractor \
+${CMAKE_BINARY_DIR}/src/exe/colmap feature_extractor \
 --database_path=$DATASET_PATH/database.db \
 --image_path=$DATASET_PATH/images \
 --SiftExtraction.num_threads=8 \

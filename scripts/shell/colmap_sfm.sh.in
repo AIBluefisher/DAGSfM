@@ -5,7 +5,7 @@ MOST_SIMILAR_IMAGES_NUM=$4
 
 begin_time=$(date "+%s")
 
-/home/chenyu/Projects/DAGSfM/build/src/exe/colmap feature_extractor \
+${CMAKE_BINARY_DIR}/src/exe/colmap feature_extractor \
 --database_path=$DATASET_PATH/database.db \
 --image_path=$DATASET_PATH/images \
 --SiftExtraction.num_threads=8 \
@@ -18,7 +18,7 @@ echo "feature extraction time: $feature_extraction_time s" > $DATASET_PATH/featu
 
 begin_time=$(date "+%s")
 
-/home/chenyu/Projects/DAGSfM/build/src/exe/colmap vocab_tree_matcher \
+${CMAKE_BINARY_DIR}/src/exe/colmap vocab_tree_matcher \
 --database_path=$DATASET_PATH/database.db \
 --SiftMatching.num_threads=8 \
 --SiftMatching.use_gpu=1 \
@@ -31,7 +31,7 @@ end_time=$(date "+%s")
 matching_time=$(($end_time - $begin_time))
 echo "feature matching time: $matching_time s" > $DATASET_PATH/matching_time.txt
 
-/home/chenyu/Projects/DAGSfM/build/src/exe/colmap mapper \
+${CMAKE_BINARY_DIR}/src/exe/colmap mapper \
 $OUTPUT_PATH \
 --database_path=$DATASET_PATH/database.db \
 --image_path=$DATASET_PATH/images \
