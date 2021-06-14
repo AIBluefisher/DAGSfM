@@ -2,3 +2,10 @@ paper
 build
 .vscode/
 lib/mirror/data/model/model.*
+
+# ignore generated scripts.
+scripts/shell/colmap_sfm.sh
+scripts/shell/distributed_sfm.sh
+scripts/shell/exhaustive_matcher.sh
+scripts/shell/extract_feature.sh
+scripts/shell/vocabulary_tree_matcher.sh
