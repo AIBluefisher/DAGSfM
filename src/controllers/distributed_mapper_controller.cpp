@@ -266,9 +266,9 @@ bool DistributedMapperController::DistributedSfM() {
   IncrementalMapperOptions local_mapper_options;
   for (size_t k = 0; k < inter_clusters_.size(); k++) {
     std::vector<std::string> image_name_list;
-    image_name_list.reserve(inter_clusters_[k].image_ids.size());
+    image_name_list.reserve(inter_clusters_[k].ImageIdsSize());
 
-    for (const auto image_id : inter_clusters_[k].image_ids) {
+    for (const auto image_id : inter_clusters_[k].ImageIds()) {
       image_name_list.push_back(image_id_to_name.at(image_id));
     }
     std::sort(image_name_list.begin(), image_name_list.end());
@@ -359,7 +359,9 @@ bool DistributedMapperController::DistributedSfM() {
   timer.Pause();
   LOG(INFO) << "Time elapsed (saving anchor node reconstruction): " << timer.ElapsedSeconds();
   for (int i = 0; i < reconstructions.size(); ++i) {
-    if (i != anchor_node.id) delete(reconstructions[i]);
+    if (i != anchor_node.id) {
+      delete(reconstructions[i]);
+    }
   }
   
   return true;
@@ -390,10 +392,12 @@ bool DistributedMapperController::DistributedFeatureExtractionAndMatching() {
 
   // Clustering images
   ImageCluster image_cluster;
-  image_cluster.image_ids = similarity_graph_.ImageIds();
+  image_cluster.SetImageIds(
+    std::unordered_set<image_t>(similarity_graph_.ImageIds().cbegin(),
+                                similarity_graph_.ImageIds().cend()));
   for (uint i = 0; i < all_image_pairs.size(); i++) {
     const ImagePair image_pair = all_image_pairs[i];
-    image_cluster.edges[image_pair] = num_inliers[i];
+    image_cluster.AddEdge(image_pair, num_inliers[i]);
   }
 
   std::unique_ptr<ImageClustering> image_clustering(
@@ -418,15 +422,15 @@ bool DistributedMapperController::DistributedFeatureExtractionAndMatching() {
   cluster_matching_pairs.reserve(cluster_num);
 
   for (size_t k = 0; k < cluster_num; k++) {
-    cluster_images[k].reserve(inter_clusters[k].image_ids.size());
-    for (const auto image_id : inter_clusters[k].image_ids) {
+    cluster_images[k].reserve(inter_clusters[k].ImageIdsSize());
+    for (const auto image_id : inter_clusters[k].ImageIds()) {
       cluster_images[k].push_back(image_id_to_name.at(image_id));
     }
     LOG(INFO) << "cluster #" << k << " has " << cluster_images[k].size()
               << " images.";
 
     std::vector<ImagePair> image_pairs;
-    for (const auto& image_pair : inter_clusters[k].edges) {
+    for (const auto& image_pair : inter_clusters[k].Edges()) {
       image_pairs.emplace_back(image_pair.first);
     }
 
@@ -629,24 +633,25 @@ bool DistributedMapperController::LoadTwoviewGeometries() {
 void DistributedMapperController::ClusteringScenes() {
   // Clustering images
   ImageCluster image_cluster;
-  image_cluster.image_ids = view_graph_.ImageIds();
+  image_cluster.SetImageIds(std::unordered_set<image_t>(
+                            view_graph_.ImageIds().cbegin(), view_graph_.ImageIds().cend()));
 
   const std::unordered_map<ImagePair, TwoViewInfo>& view_pairs =
       view_graph_.TwoViewGeometries();
   for (const auto& view_pair_it : view_pairs) {
     const ImagePair view_pair = view_pair_it.first;
-    image_cluster.edges[view_pair] = view_pair_it.second.visibility_score;
+    image_cluster.AddEdge(view_pair, view_pair_it.second.visibility_score);
   }
 
   image_clustering_ = std::unique_ptr<ImageClustering>(
       new ImageClustering(clustering_options_, image_cluster));
   image_clustering_->Cut();
-  image_clustering_->Expand();
+  image_clustering_->Expand(clustering_options_.num_threads, this);
   image_clustering_->OutputClusteringSummary();
 
   inter_clusters_ = image_clustering_->GetInterClusters();
   intra_clusters_ = image_clustering_->GetIntraClusters();
-  for (auto cluster : inter_clusters_) {
+  for (const auto& cluster : inter_clusters_) {
     cluster.ShowInfo();
   }
 }
@@ -669,7 +674,7 @@ void DistributedMapperController::ReconstructPartitions(
   // Start reconstructing the bigger clusters first for resource usage.
   const auto cmp = [](const ImageCluster& cluster1,
                       const ImageCluster& cluster2) {
-    return cluster1.image_ids.size() > cluster2.image_ids.size();
+    return cluster1.ImageIdsSize() > cluster2.ImageIdsSize();
   };
   std::sort(inter_clusters_.begin(), inter_clusters_.end(), cmp);
 
@@ -682,9 +687,9 @@ void DistributedMapperController::ReconstructPartitions(
   IncrementalMapperOptions local_mapper_options;
   for (size_t k = 0; k < inter_clusters_.size(); k++) {
     std::vector<std::string> image_name_list;
-    image_name_list.reserve(inter_clusters_[k].image_ids.size());
+    image_name_list.reserve(inter_clusters_[k].ImageIdsSize());
 
-    for (const auto image_id : inter_clusters_[k].image_ids) {
+    for (const auto image_id : inter_clusters_[k].ImageIds()) {
       image_name_list.push_back(image_id_to_name.at(image_id));
     }
     std::sort(image_name_list.begin(), image_name_list.end());
@@ -706,7 +711,7 @@ void DistributedMapperController::ReconstructPartitions(
     custom_options.num_threads = num_threads_per_worker;
     custom_options.extract_colors = true;
 
-    for (const auto image_id : cluster.image_ids) {
+    for (const auto image_id : cluster.ImageIds()) {
       custom_options.image_names.insert(image_id_to_name.at(image_id));
     }
 
@@ -778,7 +783,7 @@ void DistributedMapperController::MergeClusters(
   // Assign cluster id for each image.
   for (size_t i = 0; i < intra_clusters_.size(); i++) {
     const ImageCluster& intra_cluster = intra_clusters_[i];
-    const std::vector<image_t>& image_ids = intra_cluster.image_ids;
+    const std::unordered_set<image_t>& image_ids = intra_cluster.ImageIds();
 
     for (auto image_id : image_ids) {
       if (reconstructions[anchor_node.id]->ExistsImage(image_id)) {

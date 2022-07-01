@@ -45,7 +45,7 @@ using namespace DAGSfM;
 
 class ImageClusteringTest : public ::testing::Test {
  protected:
-  std::vector<image_t> image_ids_;
+  std::unordered_set<image_t> image_ids_;
   std::unordered_map<ImagePair, int> view_pairs_;
 
  public:
@@ -55,7 +55,7 @@ class ImageClusteringTest : public ::testing::Test {
 
     // Initialize images
     for (int i = 0; i < num_views; i++) {
-      image_ids_.push_back(i);
+      image_ids_.emplace(i);
     }
 
     // Initialize view pairs
@@ -63,8 +63,8 @@ class ImageClusteringTest : public ::testing::Test {
     CreateViewPairsFromSpanningTree(num_view_pairs);
 
     ImageCluster image_cluster;
-    image_cluster.image_ids = image_ids_;
-    image_cluster.edges = view_pairs_;
+    image_cluster.SetImageIds(image_ids_);
+    image_cluster.SetEdges(view_pairs_);
 
     ImageClustering image_clustering(options, image_cluster);
     // image_clustering.CutAndExpand();

@@ -38,36 +38,85 @@
 #include <queue>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 #include "clustering/cluster.h"
 #include "graph/graph.h"
 #include "util/hash.h"
 #include "util/timer.h"
 #include "util/types.h"
+#include "util/threading.h"
 
 using namespace colmap;
 
 namespace DAGSfM {
 
 using Edges = std::unordered_map<ImagePair, int>;
-struct ImageCluster {
+class ImageCluster {
+ private:
+  ImageCluster(const ImageCluster& rhs, const std::lock_guard<std::mutex> &) 
+  : cluster_id(rhs.cluster_id), image_ids_(rhs.image_ids_), edges_(rhs.edges_),
+    is_condition_satisfy_(rhs.is_condition_satisfy_), completed_(rhs.completed_) {}
+
+ public:
+  ImageCluster() = default;
+  // Thread safe copy constructor, and copy assignment operator.
+  ImageCluster(const ImageCluster& rhs) : ImageCluster(rhs, std::lock_guard<std::mutex>(rhs.mutex_)) {}
+  ImageCluster& operator=(const ImageCluster& rhs) {
+    if (this != &rhs) {
+      std::unique_lock<std::mutex> my_lock(mutex_, std::defer_lock);
+      std::unique_lock<std::mutex> rhs_lock(rhs.mutex_, std::defer_lock);
+      std::lock(my_lock, rhs_lock);
+      cluster_id = rhs.cluster_id;
+      image_ids_ = rhs.image_ids_;
+      edges_ = rhs.edges_;
+      is_condition_satisfy_ = rhs.is_condition_satisfy_;
+      completed_ = rhs.completed_;
+    }
+    return *this;
+  }
+ public:
   int cluster_id = 0;
-  std::vector<image_t> image_ids;
-  Edges edges;
-  bool is_condition_satisfy = false;
-  bool completed = false;
+
+  // Setters.
+  inline void SetImageIds(const std::unordered_set<image_t>& image_ids);
+  inline void SetEdges(const DAGSfM::Edges& edges);
+  inline void SetIsConditionSatisfy(const bool is_condition_satisfy);
+  inline void SetCompleted(const bool completed);
+  
+  // Add a new image id or a new edge to this image cluster.
+  inline void AddImageId(const image_t image_id);
+  inline void AddEdge(const ImagePair& view_pair, const int weight);
+  inline void AddEdge(const std::pair<ImagePair, int>& edge);
+
+  // Get const objects.
+  inline const std::unordered_set<image_t>& ImageIds() const;
+  inline const DAGSfM::Edges& Edges() const;
+  inline const bool IsConditionSatisfy() const;
+  inline const bool Completed() const;
+
+  // Get size of image_ids_ and edges_
+  inline const size_t ImageIdsSize() const;
+  inline const size_t EdgesSize() const;
 
   void ShowInfo() const {
     std::string info = "Cluster " + std::to_string(cluster_id) + ": [";
-    info += ("node: " + std::to_string(image_ids.size()));
+    info += ("node: " + std::to_string(image_ids_.size()));
     // for (auto image_id : image_ids) {
     //   std::cout << image_id << " ";
     // }
     // std::cout << "\n";
 
-    info += (", edges: " + std::to_string(edges.size()) + "]");
+    info += (", edges: " + std::to_string(edges_.size()) + "]");
     LOG(INFO) << info;
   }
+
+ private:
+  std::unordered_set<image_t> image_ids_;
+  DAGSfM::Edges edges_;
+  bool is_condition_satisfy_ = false;
+  bool completed_ = false;
+  mutable std::mutex mutex_;
 };
 
 class ImageClustering {
@@ -90,7 +139,9 @@ class ImageClustering {
     // Maximum number of edges for building connections between clusters
     uint max_num_cluster_pairs = 0;
 
-    bool is_output_igraph = true;
+    bool is_output_igraph = false;
+
+    uint num_threads = -1;
 
     std::string cluster_type = "NCUT";
 
@@ -134,8 +185,8 @@ class ImageClustering {
   ImageClustering(const Options& options, const ImageCluster& root_cluster);
 
   virtual void Cut();
-
   virtual void Expand();
+  virtual void Expand(const int num_threads, Thread* thread);
 
   virtual void ExpandAllEdges();
 
@@ -191,6 +242,75 @@ class ImageClustering {
 
   void AnalyzeStatistic();
 };
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementation
+////////////////////////////////////////////////////////////////////////////////
+
+void ImageCluster::SetImageIds(const std::unordered_set<image_t>& image_ids) {
+  std::lock_guard<std::mutex> l(mutex_);
+  image_ids_ = image_ids;
+}
+
+void ImageCluster::SetEdges(const DAGSfM::Edges& edges) {
+  std::lock_guard<std::mutex> l(mutex_);
+  edges_ = edges;
+}
+
+void ImageCluster::SetIsConditionSatisfy(const bool is_condition_satisfy) {
+  std::lock_guard<std::mutex> l(mutex_);
+  is_condition_satisfy_ = is_condition_satisfy;
+}
+
+void ImageCluster::SetCompleted(const bool completed) {
+  std::lock_guard<std::mutex> l(mutex_);
+  completed_ = completed;
+}
+
+void ImageCluster::AddImageId(const image_t image_id) {
+  std::lock_guard<std::mutex> l(mutex_);
+  image_ids_.emplace(image_id);
+}
+
+void ImageCluster::AddEdge(const ImagePair& view_pair, const int weight) {
+  std::lock_guard<std::mutex> l(mutex_);
+  edges_[view_pair] = weight;
+}
+
+void ImageCluster::AddEdge(const std::pair<ImagePair, int>& edge) {
+  std::lock_guard<std::mutex> l(mutex_);
+  edges_.emplace(edge);
+}
+
+const std::unordered_set<image_t>& ImageCluster::ImageIds() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return image_ids_;
+}
+
+const DAGSfM::Edges& ImageCluster::Edges() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return edges_;
+}
+
+const bool ImageCluster::IsConditionSatisfy() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return is_condition_satisfy_;
+}
+
+const bool ImageCluster::Completed() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return completed_;
+}
+
+const size_t ImageCluster::ImageIdsSize() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return image_ids_.size();
+}
+
+const size_t ImageCluster::EdgesSize() const {
+  std::lock_guard<std::mutex> l(mutex_);
+  return edges_.size();
+}
 
 }  // namespace DAGSfM
 
